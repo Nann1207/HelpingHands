@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PA Dashboard · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for quick charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <a href="/pa_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/>
+        </svg>
+        <span class="text-xl font-bold">Helping Hands (Platform Admin)</span>
+      </a>
+  
+      <nav class="flex items-center gap-3">
+        <a href="/pa_flags/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">
+          Flagged Requests
+        </a>
+        <form method="post" action="/api/auth/logout/"
+              class="inline-block m-0 p-0" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit"
+                  class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <!-- Greeting -->
+    <section class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Platform Admin Dashboard</h1>
+        <p class="text-gray-600" id="whoami">Checking session…</p>
+      </div>
+
+      <!-- Range + granularity + Export -->
+      <div class="flex flex-wrap items-center gap-2">
+        <input id="fromDate" type="date" class="border rounded-md px-3 py-2" />
+        <input id="toDate" type="date" class="border rounded-md px-3 py-2" />
+        <select id="granularity" class="border rounded-md px-3 py-2">
+          <option value="day">Day</option>
+          <option value="week">Week</option>
+          <option value="month" selected>Month</option>
+          <option value="year">Year</option>
+        </select>
+        <button id="applyBtn" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Apply</button>
+        <a id="exportLink" href="#" class="px-3 py-2 rounded-md border hover:bg-gray-100">Export CSV</a>
+      </div>
+    </section>
+
+    <!-- KPI Cards -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Total PINs</div>
+        <div id="kpiPins" class="text-2xl font-bold">—</div>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Total CVs</div>
+        <div id="kpiCVs" class="text-2xl font-bold">—</div>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Total CSRs</div>
+        <div id="kpiCSRs" class="text-2xl font-bold">—</div>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Open Flags</div>
+        <div id="kpiOpenFlags" class="text-2xl font-bold">—</div>
+        <div class="text-xs text-gray-500">Resolved: <span id="kpiResolvedFlags">—</span></div>
+      </div>
+    </section>
+
+    <!-- Requests status mini-cards -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Requests · Review</div>
+        <div id="reqReview" class="text-xl font-semibold">—</div>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Requests · Pending</div>
+        <div id="reqPending" class="text-xl font-semibold">—</div>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Requests · Active</div>
+        <div id="reqActive" class="text-xl font-semibold">—</div>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="text-sm text-gray-500">Requests · Complete</div>
+        <div id="reqComplete" class="text-xl font-semibold">—</div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold">Requests by Status</h2>
+          <span id="seriesRange" class="text-xs text-gray-500"></span>
+        </div>
+        <canvas id="requestsChart" height="160"></canvas>
+      </div>
+      <div class="p-4 rounded-xl bg-white shadow-sm">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold">New Users (PIN/CV/CSR)</h2>
+          <span id="usersRange" class="text-xs text-gray-500"></span>
+        </div>
+        <canvas id="usersChart" height="160"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // --- helpers ---
+    function fmtDate(d) { return d.toISOString().slice(0,10); }
+    function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+
+    // default range: last 30 days
+    const fromInput = document.getElementById("fromDate");
+    const toInput = document.getElementById("toDate");
+    const granSel = document.getElementById("granularity");
+    const applyBtn = document.getElementById("applyBtn");
+    const exportLink = document.getElementById("exportLink");
+
+    fromInput.value = fmtDate(daysAgo(30));
+    toInput.value = fmtDate(new Date());
+
+    // charts
+    let requestsChart, usersChart;
+
+    async function fetchJSON(url){
+      const resp = await fetch(url, { credentials: "include" });
+      if (!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json();
+    }
+
+    async function loadWhoAmI(){
+      try{
+        const me = await fetchJSON("/api/auth/me/");
+        document.getElementById("whoami").textContent =
+          `Logged in as ${me.username} (${me.role})`;
+      }catch(e){
+        location.href = "/login/?next=/pa_dashboard/";
+      }
+    }
+
+    function buildExportLink(){
+      const f = fromInput.value;
+      const t = toInput.value;
+      exportLink.href = `/api/admin/report/?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+    }
+
+    function ensureChart(ctx, type, data, options){
+      if (ctx.id === "requestsChart"){
+        if (requestsChart) requestsChart.destroy();
+        requestsChart = new Chart(ctx, { type, data, options });
+      } else {
+        if (usersChart) usersChart.destroy();
+        usersChart = new Chart(ctx, { type, data, options });
+      }
+    }
+
+    async function loadMetrics(){
+      const f = fromInput.value, t = toInput.value, g = granSel.value;
+
+      const url = `/api/admin/metrics/?granularity=${encodeURIComponent(g)}&from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+      const data = await fetchJSON(url);
+
+      // KPIs
+      document.getElementById("kpiPins").textContent = data.cards.total_pins;
+      document.getElementById("kpiCVs").textContent = data.cards.total_cvs;
+      document.getElementById("kpiCSRs").textContent = data.cards.total_csrs;
+
+      document.getElementById("reqReview").textContent   = data.cards.requests.review;
+      document.getElementById("reqPending").textContent  = data.cards.requests.pending;
+      document.getElementById("reqActive").textContent   = data.cards.requests.active;
+      document.getElementById("reqComplete").textContent = data.cards.requests.complete;
+
+      document.getElementById("kpiOpenFlags").textContent     = data.cards.flags.open;
+      document.getElementById("kpiResolvedFlags").textContent = data.cards.flags.resolved;
+
+      // Requests chart
+      const series = data.charts.requests_by_status || [];
+      document.getElementById("seriesRange").textContent = `${data.charts.range.from} → ${data.charts.range.to}`;
+
+      const labels = series.map(r => r.date);
+      const review   = series.map(r => r.review);
+      const pending  = series.map(r => r.pending);
+      const active   = series.map(r => r.active);
+      const complete = series.map(r => r.complete);
+
+      ensureChart(
+        document.getElementById("requestsChart").getContext("2d"),
+        "line",
+        {
+          labels,
+          datasets: [
+            { label: "Review",   data: review },
+            { label: "Pending",  data: pending },
+            { label: "Active",   data: active },
+            { label: "Complete", data: complete },
+          ]
+        },
+        { responsive: true, maintainAspectRatio: false }
+      );
+
+      // Users chart
+      const uSeries = data.charts.new_users || [];
+      document.getElementById("usersRange").textContent = `${data.charts.range.from} → ${data.charts.range.to}`;
+      const uLabels = uSeries.map(r => r.date);
+      const pins = uSeries.map(r => r.pins);
+      const cvs  = uSeries.map(r => r.cvs);
+      const csrs = uSeries.map(r => r.csrs);
+
+      ensureChart(
+        document.getElementById("usersChart").getContext("2d"),
+        "bar",
+        {
+          labels: uLabels,
+          datasets: [
+            { label: "PINs", data: pins },
+            { label: "CVs",  data: cvs },
+            { label: "CSRs", data: csrs },
+          ]
+        },
+        { responsive: true, maintainAspectRatio: false }
+      );
+
+      buildExportLink();
+    }
+
+    applyBtn.addEventListener("click", loadMetrics);
+    window.addEventListener("DOMContentLoaded", async () => {
+      await loadWhoAmI();
+      await loadMetrics();
+    });
+  </script>
+</body>
+</html>

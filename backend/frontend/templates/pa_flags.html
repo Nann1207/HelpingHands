@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Flagged Requests · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/pa_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/>
+        </svg>
+        <span class="text-xl font-bold">Helping Hands · Flags</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/pa_dashboard/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Dashboard</a>
+        <form method="post" action="/api/auth/logout/">
+          {% csrf_token %}
+          <button class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">Log out</button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <h1 class="text-2xl font-bold">Flagged Requests</h1>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-2">
+      <select id="resolved" class="border rounded-md px-3 py-2">
+        <option value="">All</option>
+        <option value="false">Open</option>
+        <option value="true">Resolved</option>
+      </select>
+      <select id="ftype" class="border rounded-md px-3 py-2">
+        <option value="">Any type</option>
+        <option value="auto">Auto</option>
+        <option value="manual">Manual</option>
+      </select>
+      <input id="fromDate" type="date" class="border rounded-md px-3 py-2" />
+      <input id="toDate" type="date" class="border rounded-md px-3 py-2" />
+      <button id="applyBtn" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Apply</button>
+    </div>
+
+    <!-- Table -->
+    <div class="rounded-xl border bg-white overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="px-3 py-2">ID</th>
+            <th class="px-3 py-2">Type</th>
+            <th class="px-3 py-2">Request</th>
+            <th class="px-3 py-2">CSR</th>
+            <th class="px-3 py-2">Reason</th>
+            <th class="px-3 py-2">Created</th>
+            <th class="px-3 py-2">Status</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <p id="status" class="text-sm text-gray-500"></p>
+  </main>
+
+  <script>
+    // CSRF helper for POST
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function fmtDate(d){ return d.toISOString().slice(0,10); }
+    function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+
+    const fromInput = document.getElementById("fromDate");
+    const toInput = document.getElementById("toDate");
+    const resolvedSel = document.getElementById("resolved");
+    const ftypeSel = document.getElementById("ftype");
+    const applyBtn = document.getElementById("applyBtn");
+    const rows = document.getElementById("rows");
+    const statusLine = document.getElementById("status");
+
+    fromInput.value = fmtDate(daysAgo(30));
+    toInput.value = fmtDate(new Date());
+
+    async function fetchJSON(url){
+      const r = await fetch(url, { credentials: "include" });
+      if (!r.ok) throw new Error("HTTP "+r.status);
+      return r.json();
+    }
+
+    async function load(){
+      const params = new URLSearchParams();
+      if (resolvedSel.value) params.set("resolved", resolvedSel.value);
+      if (ftypeSel.value) params.set("flag_type", ftypeSel.value);
+      if (fromInput.value) params.set("from", fromInput.value);
+      if (toInput.value) params.set("to", toInput.value);
+
+      const url = "/api/admin/flags/?" + params.toString();
+      const data = await fetchJSON(url); // boundary returns list of flags
+      rows.innerHTML = "";
+      (data || []).forEach(f => {
+        const tr = document.createElement("tr");
+        tr.className = "border-t";
+        tr.innerHTML = `
+          <td class="px-3 py-2">${f.id}</td>
+          <td class="px-3 py-2 capitalize">${f.flag_type}</td>
+          <td class="px-3 py-2">
+            <div class="text-sm font-medium">${f.request_id}</div>
+            <div class="text-xs text-gray-500">${f.request_status} • ${f.service_type}</div>
+          </td>
+          <td class="px-3 py-2">${f.csr_name ?? "-"}</td>
+          <td class="px-3 py-2">${f.reason ?? ""}</td>
+          <td class="px-3 py-2">${f.created_at?.slice(0,19).replace("T"," ")}</td>
+          <td class="px-3 py-2">${f.resolved ? "Resolved" : "Open"}</td>
+          <td class="px-3 py-2 text-right">
+            ${f.resolved ? "" : `<button data-id="${f.id}" class="resolve px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700">Resolve</button>`}
+          </td>
+        `;
+        rows.appendChild(tr);
+      });
+
+      statusLine.textContent = `Loaded ${data?.length || 0} flags`;
+      // attach resolve handlers
+      document.querySelectorAll("button.resolve").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          if (!id) return;
+          try{
+            const resp = await fetch(`/api/admin/flags/${id}/resolve/`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "X-CSRFToken": csrftoken },
+              body: new URLSearchParams({ notes: "Resolved via dashboard" })
+            });
+            if (!resp.ok) throw new Error("HTTP "+resp.status);
+            await load(); // refresh
+          }catch(e){ alert("Resolve failed: "+e.message); }
+        });
+      });
+    }
+
+    applyBtn.addEventListener("click", load);
+    window.addEventListener("DOMContentLoaded", load);
+  </script>
+</body>
+</html>

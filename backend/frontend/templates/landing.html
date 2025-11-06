@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Helping Hands</title>
+  <meta name="description" content="Helping Hands connects trained volunteers with individuals who need safe escort to medical, therapy, and community appointments." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><path fill=%22%23ef4444%22 d=%22M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z%22/></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Skip link for accessibility -->
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-white border rounded px-3 py-2">Skip to content</a>
+
+  <!-- Header -->
+  <header class="border-b border-gray-200 backdrop-blur-sm bg-white/80 sticky top-0 z-50 shadow-sm">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2" aria-label="Helping Hands home">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 21S4 13.748 4 9a5 5 0 0 1 10 0 5 5 0 1 1 10 0c0 4.748-8 12-8 12Z"/>
+        </svg>
+        <span class="text-2xl font-bold bg-gradient-to-r from-red-500 to-pink-500 bg-clip-text text-transparent">
+          Helping Hands
+        </span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6" aria-label="Primary">
+        <a href="#services" class="text-sm font-medium hover:text-red-600 transition-colors">Services</a>
+        <a href="#faq" class="text-sm font-medium hover:text-red-600 transition-colors">FAQ</a>
+        <!-- If you built your own login page, keep /login/. If using Django admin auth, point to /admin/login/ -->
+        <a href="/login/" class="text-sm font-medium bg-red-500 text-white px-3 py-1.5 rounded-md hover:bg-red-600 transition-colors">Log In</a>
+      </nav>
+      <!-- Mobile menu button (optional placeholder) -->
+      <button class="md:hidden inline-flex items-center gap-2 px-3 py-2 border rounded" aria-label="Open menu">
+        <span class="text-sm">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden bg-white">
+      <div class="container mx-auto px-4 py-16 md:py-24">
+        <div class="grid md:grid-cols-2 gap-12 items-center">
+          <div class="space-y-6">
+            <h1 class="text-4xl md:text-6xl font-bold leading-tight">
+              Compassionate <span class="text-red-500">Volunteer Escorts</span><br class="hidden md:block" />
+              for Medical & Community Appointments
+            </h1>
+            <p class="text-lg md:text-xl text-gray-700">
+              We connect trained volunteers with individuals who need safe, reliable companionship to clinics,
+              therapy sessions, dialysis, vaccinations, and community events.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4">
+              <a href="#services" class="bg-red-500 text-white px-6 py-3 rounded-lg text-center text-lg font-medium hover:bg-red-600 transition-colors">View Services</a>
+              <a href="/login/" class="border border-gray-300 px-6 py-3 rounded-lg text-center text-lg font-medium hover:bg-gray-100 transition-colors">Log In to Get Started</a>
+            </div>
+          </div>
+          <div class="relative">
+            <img src="https://picsum.photos/800/600" alt="Volunteer accompanying a person to a clinic entrance" class="rounded-2xl shadow-2xl w-full">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="py-16 md:py-24 bg-gray-50">
+      <div class="container mx-auto px-4">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl md:text-5xl font-bold mb-4">
+            Our <span class="text-red-500">Escort Services</span>
+          </h2>
+          <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+            Tailored support for every need, ensuring safe and compassionate companionship
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Healthcare -->
+          <div class="p-6 border rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+            <div class="w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">Healthcare Escort</h3>
+            <p class="text-gray-700 mb-3">General medical appointments or consultations not tied to specific treatments.</p>
+            <p class="text-sm text-gray-500"><span class="font-semibold">Examples:</span> GP visits, outpatient check-ups, hospital follow-ups</p>
+          </div>
+
+          <!-- Therapy -->
+          <div class="p-6 border rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+            <div class="w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">Therapy Escort</h3>
+            <p class="text-gray-700 mb-3">Support to physiotherapy, occupational, or counseling sessions.</p>
+            <p class="text-sm text-gray-500"><span class="font-semibold">Examples:</span> PT, OT, speech therapy, mental health visits</p>
+          </div>
+
+          <!-- Dialysis -->
+          <div class="p-6 border rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+            <div class="w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">Dialysis Escort</h3>
+            <p class="text-gray-700 mb-3">Reliable accompaniment for recurring dialysis schedules.</p>
+            <p class="text-sm text-gray-500"><span class="font-semibold">Examples:</span> Hemodialysis, peritoneal dialysis appointments</p>
+          </div>
+
+          <!-- Vaccination / Check-up -->
+          <div class="p-6 border rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+            <div class="w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">Vaccination / Check-up</h3>
+            <p class="text-gray-700 mb-3">Short appointments for vaccinations, tests, or wellness screenings.</p>
+            <p class="text-sm text-gray-500"><span class="font-semibold">Examples:</span> Flu shots, blood tests, health screenings</p>
+          </div>
+
+          <!-- Mobility Assistance -->
+          <div class="p-6 border rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+            <div class="w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">Mobility Assistance</h3>
+            <p class="text-gray-700 mb-3">Extra help for individuals with reduced mobility during trips.</p>
+            <p class="text-sm text-gray-500"><span class="font-semibold">Examples:</span> Wheelchair navigation, transfers, wayfinding</p>
+          </div>
+
+          <!-- Community Event -->
+          <div class="p-6 border rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+            <div class="w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold mb-2">Community Event</h3>
+            <p class="text-gray-700 mb-3">Safe companionship to social, cultural, or community activities.</p>
+            <p class="text-sm text-gray-500"><span class="font-semibold">Examples:</span> Support groups, library visits, community fairs</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="py-16 md:py-24">
+      <div class="container mx-auto px-4 text-center mb-12">
+        <h2 class="text-3xl md:text-5xl font-bold mb-4">
+          Frequently Asked <span class="text-red-500">Questions</span>
+        </h2>
+        <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+          Find answers to common questions about our escort services
+        </p>
+      </div>
+
+      <div class="container mx-auto px-4 max-w-3xl space-y-4">
+        <details class="border rounded-lg p-4 bg-white open:shadow">
+          <summary class="font-semibold cursor-pointer">How do I request an escort service?</summary>
+          <p class="text-gray-600 mt-2">
+            Log in to your account and submit a request with your appointment details. Our team will match you with an available volunteer.
+          </p>
+        </details>
+        <details class="border rounded-lg p-4 bg-white">
+          <summary class="font-semibold cursor-pointer">Are the volunteers trained and vetted?</summary>
+          <p class="text-gray-600 mt-2">
+            Yes, all volunteers undergo background checks and receive safety and first aid training.
+          </p>
+        </details>
+        <details class="border rounded-lg p-4 bg-white">
+          <summary class="font-semibold cursor-pointer">Is there a cost for the escort service?</summary>
+          <p class="text-gray-600 mt-2">
+            Our services are provided by volunteers at no cost. Donations are welcome to sustain operations.
+          </p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 py-12 bg-gray-50">
+    <div class="container mx-auto px-4">
+      <div class="grid md:grid-cols-4 gap-8">
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z"/>
+            </svg>
+            <span class="text-xl font-bold">Helping Hands</span>
+          </div>
+          <p class="text-sm text-gray-600">
+            Providing compassionate escort services to connect volunteers with those in need.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-semibold mb-4">Services</h3>
+          <ul class="space-y-2 text-sm text-gray-600">
+            <li><a href="#services" class="hover:text-gray-900">Healthcare Escort</a></li>
+            <li><a href="#services" class="hover:text-gray-900">Therapy Escort</a></li>
+            <li><a href="#services" class="hover:text-gray-900">Dialysis Escort</a></li>
+            <li><a href="#services" class="hover:text-gray-900">Mobility Assistance</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="font-semibold mb-4">Company</h3>
+          <ul class="space-y-2 text-sm text-gray-600">
+            <li><a href="#" class="hover:text-gray-900">About Us</a></li>
+            <li><a href="#" class="hover:text-gray-900">How It Works</a></li>
+            <li><a href="#faq" class="hover:text-gray-900">FAQ</a></li>
+            <li><a href="#" class="hover:text-gray-900">Contact</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="font-semibold mb-4">Get Involved</h3>
+          <ul class="space-y-2 text-sm text-gray-600">
+            <li><a href="#" class="hover:text-gray-900">Become a Volunteer</a></li>
+            <li><a href="#" class="hover:text-gray-900">Request Help</a></li>
+            <li><a href="/admin/login/" class="hover:text-gray-900">Platform Admin</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-12 pt-8 border-t border-gray-200 text-center text-sm text-gray-600">
+        © 2025 Helping Hands. All rights reserved.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

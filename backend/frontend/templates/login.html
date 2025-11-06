@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Login • Helping Hands</title>
+  <meta name="description" content="Sign in or create an account to use Helping Hands."/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><path fill=%22%23ef4444%22 d=%22M12 21S4 13.748 4 9a5 5 0 1 1 8 4 5 5 0 1 1 8-4c0 4.748-8 12-8 12Z%22/></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Header (same vibe as landing) -->
+  <header class="border-b border-gray-200 backdrop-blur-sm bg-white/80 sticky top-0 z-50 shadow-sm">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2" aria-label="Helping Hands home">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-red-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 21S4 13.748 4 9a5 5 0 0 1 10 0 5 5 0 1 1 10 0c0 4.748-8 12-8 12Z"/>
+        </svg>
+        <span class="text-2xl font-bold bg-gradient-to-r from-red-500 to-pink-500 bg-clip-text text-transparent">
+          Helping Hands
+        </span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6" aria-label="Primary">
+        <a href="/" class="text-sm font-medium hover:text-red-600 transition-colors">Home</a>
+        <a href="/#services" class="text-sm font-medium hover:text-red-600 transition-colors">Services</a>
+        <a href="/#faq" class="text-sm font-medium hover:text-red-600 transition-colors">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="min-h-[80vh]">
+    <section class="container mx-auto px-4 py-12 md:py-20">
+      <div class="mx-auto max-w-md bg-white rounded-2xl shadow-md border border-gray-200">
+        <div class="px-6 pt-8 pb-2 text-center space-y-2">
+          <h1 class="text-2xl font-bold">Welcome</h1>
+          <p class="text-gray-600">Log in or create an account to continue</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="px-6">
+          <div class="grid grid-cols-2 text-center rounded-lg border border-gray-200 overflow-hidden">
+            <button id="tab-login" class="py-2.5 text-sm font-medium bg-red-50 text-red-600" type="button">Login</button>
+            <button id="tab-signup" class="py-2.5 text-sm font-medium hover:bg-gray-50" type="button">Sign Up</button>
+          </div>
+        </div>
+
+        <!-- LOGIN -->
+        <div id="panel-login" class="px-6 pb-8 pt-6 space-y-4">
+          <!-- Optional server error flash -->
+          {% if messages %}
+            <div class="space-y-2">
+              {% for message in messages %}
+                <div class="text-sm px-3 py-2 rounded border {% if message.tags == 'error' %}border-red-300 text-red-700 bg-red-50{% else %}border-gray-200 bg-gray-50{% endif %}">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <!--
+            ACTION:
+              - If using your own API, set to /api/auth/login/ and handle redirect client-side.
+              - If you just need PA via Django admin, you can link to /admin/login/ instead of this form.
+          -->
+          <form method="post" action="/api/auth/login/">
+            {% csrf_token %}
+            <div class="space-y-2">
+              <label for="login-username" class="text-sm font-medium">Username</label>
+              <input id="login-username" name="username" type="text" required placeholder="e.g. pin_ali"
+                     class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+            </div>
+
+            <div class="space-y-2 mt-4">
+              <label for="login-password" class="text-sm font-medium">Password</label>
+              <input id="login-password" name="password" type="password" required placeholder="••••••••"
+                     class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+            </div>
+
+            <button type="submit" class="mt-6 w-full bg-red-500 text-white px-4 py-2.5 rounded-md font-medium hover:bg-red-600 transition-colors">
+              Login
+            </button>
+
+            <p class="mt-3 text-center text-xs text-gray-500">
+              By continuing you agree to our Terms and Conditions.
+            </p>
+          </form>
+        </div>
+
+        <!-- SIGN UP -->
+        <div id="panel-signup" class="hidden px-6 pb-8 pt-6 space-y-4">
+          <form method="post" action="/register/">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Role -->
+              <div class="space-y-2 sm:col-span-2">
+                <label for="role" class="text-sm font-medium">Account Type</label>
+                <select id="role" name="role"
+                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+                  <option value="PIN">Person-in-Need (PIN)</option>
+                  <option value="CV">Corporate Volunteer (CV)</option>
+                  <option value="CSR">CSR Representative</option>
+                  <option value="ADMIN">Platform Admin</option>
+                </select>
+              </div>
+
+              <div class="space-y-2">
+                <label for="username" class="text-sm font-medium">Username</label>
+                <input id="username" name="username" required
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+              </div>
+
+              <div class="space-y-2">
+                <label for="password" class="text-sm font-medium">Password</label>
+                <input id="password" name="password" type="password" required
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+              </div>
+
+              <div class="space-y-2 sm:col-span-2">
+                <label for="full_name" class="text-sm font-medium">Full Name</label>
+                <input id="full_name" name="full_name" required
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+              </div>
+
+              <div class="space-y-2">
+                <label for="email" class="text-sm font-medium">Email</label>
+                <input id="email" name="email" type="email"
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+              </div>
+
+              <div class="space-y-2">
+                <label for="dob" class="text-sm font-medium">Date of Birth</label>
+                <input id="dob" name="date_of_birth" placeholder="YYYY-MM-DD"
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+              </div>
+
+              <div class="space-y-2 sm:col-span-2">
+                <label for="address" class="text-sm font-medium">Home Address</label>
+                <input id="address" name="home_address"
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+              </div>
+
+              <!-- Company fields (only CV/CSR) -->
+              <div id="company-fields" class="hidden contents">
+                <div class="space-y-2">
+                  <label for="company_name" class="text-sm font-medium">Company Name</label>
+                  <input id="company_name" name="company_name"
+                         class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+                </div>
+                <div class="space-y-2">
+                  <label for="company_id" class="text-sm font-medium">Company ID</label>
+                  <input id="company_id" name="company_id"
+                         class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+                </div>
+                <div class="space-y-2 sm:col-span-2">
+                  <label for="company_email" class="text-sm font-medium">Company Email</label>
+                  <input id="company_email" name="company_email" type="email"
+                         class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"/>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="mt-6 w-full bg-red-500 text-white px-4 py-2.5 rounded-md font-medium hover:bg-red-600 transition-colors">
+              Create Account
+            </button>
+
+            <p class="mt-3 text-center text-xs text-gray-500">
+              PIN sign-ups may auto-create preferences. CV/CSR might require admin verification.
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 py-12 bg-gray-50">
+    <div class="container mx-auto px-4 text-center text-sm text-gray-600">
+      © 2025 Helping Hands. All rights reserved.
+    </div>
+  </footer>
+
+  <!-- Tiny JS: tabs + role/company fields -->
+  <script>
+    (function () {
+      const tabLogin = document.getElementById('tab-login');
+      const tabSignup = document.getElementById('tab-signup');
+      const panelLogin = document.getElementById('panel-login');
+      const panelSignup = document.getElementById('panel-signup');
+
+      function activate(tab) {
+        const isLogin = tab === 'login';
+
+        // buttons
+        tabLogin.classList.toggle('bg-red-50', isLogin);
+        tabLogin.classList.toggle('text-red-600', isLogin);
+        tabSignup.classList.toggle('bg-red-50', !isLogin);
+        tabSignup.classList.toggle('text-red-600', !isLogin);
+
+        // panels
+        panelLogin.classList.toggle('hidden', !isLogin);
+        panelSignup.classList.toggle('hidden', isLogin);
+      }
+
+      tabLogin.addEventListener('click', () => activate('login'));
+      tabSignup.addEventListener('click', () => activate('signup'));
+
+      // role -> company fields
+      const roleSel = document.getElementById('role');
+      const companyFields = document.getElementById('company-fields');
+
+      function updateCompanyVisibility() {
+        const v = roleSel.value;
+        const show = (v === 'CV' || v === 'CSR');
+        companyFields.classList.toggle('hidden', !show);
+      }
+      roleSel.addEventListener('change', updateCompanyVisibility);
+      updateCompanyVisibility(); // initial
+
+      // if URL has ?role=CV etc, preselect
+      const params = new URLSearchParams(window.location.search);
+      const preRole = params.get('role');
+      if (preRole) {
+        roleSel.value = preRole;
+        updateCompanyVisibility();
+        activate('signup');
+      } else {
+        activate('login');
+      }
+    })();
+  </script>
+</body>
+</html>
