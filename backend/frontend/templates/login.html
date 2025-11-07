@@ -46,7 +46,7 @@
 
         <!-- LOGIN -->
         <div id="panel-login" class="px-6 pb-8 pt-6 space-y-4">
-          <!-- Optional server error flash -->
+          <!-- TO show error -->
           {% if messages %}
             <div class="space-y-2">
               {% for message in messages %}
@@ -57,11 +57,7 @@
             </div>
           {% endif %}
 
-          <!--
-            ACTION:
-              - If using your own API, set to /api/auth/login/ and handle redirect client-side.
-              - If you just need PA via Django admin, you can link to /admin/login/ instead of this form.
-          -->
+          <!--To log in-->
           <form method="post" action="/api/auth/login/">
             {% csrf_token %}
             <div class="space-y-2">
@@ -86,7 +82,7 @@
           </form>
         </div>
 
-        <!-- SIGN UP -->
+        <!-- SIGN UP THIS IS JUST A PLACEHOLDER NOT A PART OF OUR USER STORY-->
         <div id="panel-signup" class="hidden px-6 pb-8 pt-6 space-y-4">
           <form method="post" action="/register/">
             {% csrf_token %}
@@ -180,7 +176,7 @@
     </div>
   </footer>
 
-  <!-- Tiny JS: tabs + role/company fields -->
+  <!-- JS: tabs and role/company fields -->
   <script>
     (function () {
       const tabLogin = document.getElementById('tab-login');

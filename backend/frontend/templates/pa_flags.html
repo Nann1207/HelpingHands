@@ -69,8 +69,53 @@
     <p id="status" class="text-sm text-gray-500"></p>
   </main>
 
+  <!-- Decision Modal -->
+  <div id="modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative max-w-md mx-auto mt-24 bg-white rounded-xl shadow-lg overflow-hidden">
+      <div class="px-5 py-4 border-b flex items-center justify-between">
+        <h3 class="font-semibold">Resolve Flag</h3>
+        <button id="modalClose" class="text-gray-500 hover:text-gray-700">&times;</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="text-sm text-gray-600">
+          Flag <code id="modalFlagId" class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-800"></code>
+          for Request <code id="modalReqId" class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-800"></code>
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-sm font-medium">Decision</div>
+          <div class="flex items-center gap-4">
+            <label class="inline-flex items-center gap-2">
+              <input type="radio" name="decision" value="accept" class="decision" checked>
+              <span>Accept</span>
+            </label>
+            <label class="inline-flex items-center gap-2">
+              <input type="radio" name="decision" value="reject" class="decision">
+              <span>Reject</span>
+            </label>
+          </div>
+          <p class="text-xs text-gray-500">Accept = flag valid (request continues). Reject = flag invalid (request rejected). Notes required for reject.</p>
+        </div>
+
+        <div>
+          <label for="modalNotes" class="text-sm font-medium">Resolution notes</label>
+          <textarea id="modalNotes" rows="4" class="mt-1 w-full border rounded-md p-2"
+            placeholder="Add any context for your decision…"></textarea>
+          <p id="notesHint" class="text-xs text-gray-500 mt-1">Optional for Accept. Required for Reject.</p>
+        </div>
+
+        <div id="modalError" class="hidden text-sm text-red-600"></div>
+      </div>
+      <div class="px-5 py-4 bg-gray-50 border-t flex items-center justify-end gap-2">
+        <button id="modalCancel" class="px-3 py-2 rounded-md border hover:bg-gray-100">Cancel</button>
+        <button id="modalSubmit" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Resolve</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // CSRF helper for POST
+    // ---------- CSRF ----------
     function getCookie(name) {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -78,19 +123,32 @@
     }
     const csrftoken = getCookie('csrftoken');
 
+    // ---------- Elements ----------
+    const fromInput   = document.getElementById("fromDate");
+    const toInput     = document.getElementById("toDate");
+    const resolvedSel = document.getElementById("resolved");
+    const ftypeSel    = document.getElementById("ftype");
+    const applyBtn    = document.getElementById("applyBtn");
+    const rows        = document.getElementById("rows");
+    const statusLine  = document.getElementById("status");
+
+    // Modal refs
+    const modal       = document.getElementById("modal");
+    const modalClose  = document.getElementById("modalClose");
+    const modalCancel = document.getElementById("modalCancel");
+    const modalSubmit = document.getElementById("modalSubmit");
+    const modalNotes  = document.getElementById("modalNotes");
+    const modalFlagId = document.getElementById("modalFlagId");
+    const modalReqId  = document.getElementById("modalReqId");
+    const modalError  = document.getElementById("modalError");
+
+    let activeFlagId = null;
+
+    // Optional: default last 30 days (keep if you like)
     function fmtDate(d){ return d.toISOString().slice(0,10); }
     function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
-
-    const fromInput = document.getElementById("fromDate");
-    const toInput = document.getElementById("toDate");
-    const resolvedSel = document.getElementById("resolved");
-    const ftypeSel = document.getElementById("ftype");
-    const applyBtn = document.getElementById("applyBtn");
-    const rows = document.getElementById("rows");
-    const statusLine = document.getElementById("status");
-
     fromInput.value = fmtDate(daysAgo(30));
-    toInput.value = fmtDate(new Date());
+    toInput.value   = fmtDate(new Date());
 
     async function fetchJSON(url){
       const r = await fetch(url, { credentials: "include" });
@@ -98,58 +156,118 @@
       return r.json();
     }
 
+    function openModal(flag){
+      activeFlagId = flag.id;
+      modalFlagId.textContent = flag.id;
+      modalReqId.textContent  = flag.request_id ?? "-";
+      modalNotes.value = "";
+      modalError.classList.add("hidden");
+      // default decision = accept
+      document.querySelectorAll('input.decision[value="accept"]')[0].checked = true;
+      modal.classList.remove("hidden");
+    }
+    function closeModal(){
+      modal.classList.add("hidden");
+      activeFlagId = null;
+    }
+
     async function load(){
       const params = new URLSearchParams();
       if (resolvedSel.value) params.set("resolved", resolvedSel.value);
-      if (ftypeSel.value) params.set("flag_type", ftypeSel.value);
-      if (fromInput.value) params.set("from", fromInput.value);
-      if (toInput.value) params.set("to", toInput.value);
+      if (ftypeSel.value)    params.set("flag_type", ftypeSel.value);
+      if (fromInput.value)   params.set("from", fromInput.value);
+      if (toInput.value)     params.set("to", toInput.value);
 
       const url = "/api/admin/flags/?" + params.toString();
-      const data = await fetchJSON(url); // boundary returns list of flags
+      const data = await fetchJSON(url);
+
       rows.innerHTML = "";
       (data || []).forEach(f => {
         const tr = document.createElement("tr");
         tr.className = "border-t";
+        const reason = f.reasonbycsr ?? f.reason ?? "";
+        const created = f.created_at ? f.created_at.slice(0,19).replace("T"," ") : "";
+        const requestStatus = f.request_status ?? ""; // depends on serializer; safe fallback
+        const serviceType = f.service_type ?? "";
+        const csrName = f.csr_name ?? f.csr ?? "-";   // depends on serializer; safe fallback
+
         tr.innerHTML = `
           <td class="px-3 py-2">${f.id}</td>
           <td class="px-3 py-2 capitalize">${f.flag_type}</td>
           <td class="px-3 py-2">
-            <div class="text-sm font-medium">${f.request_id}</div>
-            <div class="text-xs text-gray-500">${f.request_status} • ${f.service_type}</div>
+            <div class="text-sm font-medium">${f.request_id ?? "-"}</div>
+            <div class="text-xs text-gray-500">${requestStatus}${requestStatus && serviceType ? " • " : ""}${serviceType}</div>
           </td>
-          <td class="px-3 py-2">${f.csr_name ?? "-"}</td>
-          <td class="px-3 py-2">${f.reason ?? ""}</td>
-          <td class="px-3 py-2">${f.created_at?.slice(0,19).replace("T"," ")}</td>
+          <td class="px-3 py-2">${csrName}</td>
+          <td class="px-3 py-2">${reason}</td>
+          <td class="px-3 py-2">${created}</td>
           <td class="px-3 py-2">${f.resolved ? "Resolved" : "Open"}</td>
           <td class="px-3 py-2 text-right">
-            ${f.resolved ? "" : `<button data-id="${f.id}" class="resolve px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700">Resolve</button>`}
+            ${f.resolved
+              ? ""
+              : `<button data-id="${f.id}" class="edit px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700">Edit</button>`}
           </td>
         `;
         rows.appendChild(tr);
       });
 
       statusLine.textContent = `Loaded ${data?.length || 0} flags`;
-      // attach resolve handlers
-      document.querySelectorAll("button.resolve").forEach(btn => {
-        btn.addEventListener("click", async () => {
+
+      // Hook up "Edit" buttons
+      document.querySelectorAll("button.edit").forEach(btn => {
+        btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-id");
-          if (!id) return;
-          try{
-            const resp = await fetch(`/api/admin/flags/${id}/resolve/`, {
-              method: "POST",
-              credentials: "include",
-              headers: { "X-CSRFToken": csrftoken },
-              body: new URLSearchParams({ notes: "Resolved via dashboard" })
-            });
-            if (!resp.ok) throw new Error("HTTP "+resp.status);
-            await load(); // refresh
-          }catch(e){ alert("Resolve failed: "+e.message); }
+          const flag = (data || []).find(x => String(x.id) === String(id));
+          if (!flag) return;
+          openModal(flag);
         });
       });
     }
 
+    // Submit decision
+    async function submitDecision(){
+      if (!activeFlagId) return;
+      const decision = document.querySelector('input[name="decision"]:checked')?.value || "accept";
+      const notes = modalNotes.value.trim();
+
+      if (decision === "reject" && !notes){
+        modalError.textContent = "Notes are required to reject.";
+        modalError.classList.remove("hidden");
+        return;
+      }
+
+      const endpoint = decision === "accept"
+        ? `/api/admin/flags/${activeFlagId}/accept/`
+        : `/api/admin/flags/${activeFlagId}/reject/`;
+
+      try{
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "X-CSRFToken": csrftoken,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ resolution_notes: notes })
+        });
+        if (!resp.ok){
+          const t = await resp.text();
+          throw new Error(`HTTP ${resp.status} - ${t}`);
+        }
+        closeModal();
+        await load(); // refresh table
+      }catch(e){
+        modalError.textContent = `Failed: ${e.message}`;
+        modalError.classList.remove("hidden");
+      }
+    }
+
+    // Events
     applyBtn.addEventListener("click", load);
+    document.getElementById("modalCancel").addEventListener("click", closeModal);
+    document.getElementById("modalClose").addEventListener("click", closeModal);
+    modalSubmit.addEventListener("click", submitDecision);
+
     window.addEventListener("DOMContentLoaded", load);
   </script>
 </body>

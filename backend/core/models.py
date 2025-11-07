@@ -1,11 +1,13 @@
+from datetime import timezone
 import uuid
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator
+from django.conf import settings
 
 
 
 #THIS SECTION IS FOR USER PROFILES
-
 
 User = get_user_model() #Where the user's username, password and email are stored 
 
@@ -59,6 +61,11 @@ class LanguageChoices(models.TextChoices):
     ZH = "zh", "Chinese"
     TA = "ta", "Tamil"
     MS = "ms", "Malay"
+
+
+class ResolutionOutcome(models.TextChoices):
+    ACCEPTED = "accepted", "Accepted"   # PA accepted the flag, Request continues
+    REJECTED = "rejected", "Rejected"   # PA rejected, Request rejected
 
 
 #Base profile, necessary info needed for all profiles
@@ -194,7 +201,7 @@ class Request(models.Model):
     #when matched, store the CV (nullable until ACTIVE/COMPLETE)
     cv = models.ForeignKey(
         CV,
-        on_delete=models.SET_NULL,   # if CV leaves the system, keep the request history
+        on_delete=models.SET_NULL,   #if CV leaves the system, keep the request history
         null=True,
         blank=True,
         related_name="assigned_requests",
@@ -246,14 +253,14 @@ class Request(models.Model):
 
 #THIS IS FOR PA
 class FlagType(models.TextChoices):
-    AUTO = "auto", "Auto-Flagged"
-    MANUAL = "manual", "Manually Flagged by CSR"
+    AUTO = "auto", "Auto-Flagged" #System will raise this
+    MANUAL = "manual", "Manually Flagged by CSR" #CSR will raise this
 
 
 #Stores both auto and manual flags for a Request
 class FlaggedRequest(models.Model):
 
-    request = models.ForeignKey(
+    request = models.ForeignKey( #Links to the Request being flagged
         Request,
         on_delete=models.CASCADE,
         related_name="flags"
@@ -262,7 +269,7 @@ class FlaggedRequest(models.Model):
     flag_type = models.CharField(
         max_length=10,
         choices=FlagType.choices
-    )
+    ) #Either auto or manual flag
 
     csr = models.ForeignKey(
         CSRRep,
@@ -272,7 +279,7 @@ class FlaggedRequest(models.Model):
         related_name="flags_made",
     )
 
-    reason = models.TextField(
+    reasonbycsr = models.TextField(
         blank=True,
         help_text="Why this was flagged (auto reason or CSR comment)."
     )
@@ -280,17 +287,21 @@ class FlaggedRequest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     
-    resolved = models.BooleanField(default=False) #Whether the flag has been resolved
-    resolved_at = models.DateTimeField(null=True, blank=True)  
+    resolved = models.BooleanField(default=False) #This is to get all the open flags easily and an indicator if resolved or not, True is done, False still open
+    resolved_at = models.DateTimeField(null=True, blank=True)
     resolved_by = models.ForeignKey(
-        PA,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="flags_resolved",
-        help_text="PA who resolved the flag."
+        PA, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="flags_resolved"
     )
     resolution_notes = models.TextField(blank=True)
+
+   
+    resolution_outcome = models.CharField(
+        max_length=10,
+        choices=ResolutionOutcome.choices,
+        null=True, blank=True,
+        help_text="Whether PA accepted or rejected this flag." #Basically the outcome.
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -300,7 +311,10 @@ class FlaggedRequest(models.Model):
         ]
 
     def __str__(self):
-        who = self.csr.name if self.csr else "system" #If auto it will show system
-        return f"Flag {self.flag_type} on {self.request_id} by {who}"
+        who = self.csr.name if self.csr else "system" #If auto it will show system.
+        
+        return f"Flag {self.flag_type} on {self.request.id} by {who}"
+
+
 
 

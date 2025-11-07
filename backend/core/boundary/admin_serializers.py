@@ -2,17 +2,36 @@ from rest_framework import serializers
 from core.models import FlaggedRequest, Request
 
 class FlaggedRequestSerializer(serializers.ModelSerializer):
+    
+    
     request_id = serializers.CharField(source="request.id", read_only=True)
-    csr_name = serializers.CharField(source="csr.name", read_only=True)
-    resolved_by_name = serializers.CharField(source="resolved_by.name", read_only=True)
+    request_status = serializers.CharField(source="request.status", read_only=True)
+    service_type = serializers.CharField(source="request.service_type", read_only=True)
+    csr_name = serializers.CharField(source="csr.name", allow_null=True, default=None, read_only=True)
+
+    
+    reason = serializers.SerializerMethodField()
 
     class Meta:
         model = FlaggedRequest
         fields = [
-            "id", "request_id", "flag_type", "csr_name",
-            "reason", "created_at", "resolved",
-            "resolved_by_name", "resolved_at", "resolution_notes",
+            "id",
+            "flag_type",
+            "request_id",
+            "request_status",
+            "service_type",
+            "csr_name",
+            "reason",
+            "created_at",
+            "resolved",
+            "resolved_at",
+            "resolved_by",
+            "resolution_notes",
+            "resolution_outcome",
         ]
+
+    def get_reason(self, obj):
+        return getattr(obj, "reasonbycsr", "")
 
 class RequestSummarySerializer(serializers.ModelSerializer):
     pin_id = serializers.CharField(source="pin.id", read_only=True)

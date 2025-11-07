@@ -11,6 +11,7 @@ from django.contrib.auth.models import AbstractUser
 
 from core.models import Company, PersonInNeed, CV, CSRRep, PA, ServiceCategory
 
+
 User = get_user_model()
 
 

@@ -1,19 +1,21 @@
+# core/management/commands/seed_demo.py
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta, time, date
+from datetime import date, time, timedelta
 
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from faker import Faker   # type: ignore
+from faker import Faker  # type: ignore
 
 from core.models import (
     Company, PersonInNeed, CV, CSRRep, PA,
     Request, RequestStatus, FlaggedRequest, FlagType,
     ServiceCategory, GenderChoices, LanguageChoices,
+    ResolutionOutcome,
 )
 
 # -----------------------
@@ -50,14 +52,12 @@ def rand_service_category() -> str:
 
 
 def rand_date_within(days_back=45, days_forward=45) -> date:
-    """Return a random date between [today - days_back, today + days_forward]."""
     base = timezone.now().date()
     delta = random.randint(-days_back, days_forward)
     return base + timedelta(days=delta)
 
 
 def rand_time() -> time:
-    """Random hour/minute, business-ish hours."""
     h = random.choice(range(8, 21))   # 8 AM to 8 PM
     m = random.choice([0, 15, 30, 45])
     return time(hour=h, minute=m)
@@ -69,9 +69,9 @@ def weighted_choice(items_with_weights):
     return random.choices(items, weights=weights, k=1)[0]
 
 
-def set_created(obj, days_back=60, days_forward=0):
+def set_created(obj, days_back=60):
     """
-    Randomize created_at into the past (and optionally future) for nicer charts.
+    Randomize created_at into the past for nicer charts.
     Works on models that have a 'created_at' field.
     """
     if not hasattr(obj, "created_at"):
@@ -81,17 +81,15 @@ def set_created(obj, days_back=60, days_forward=0):
     return obj
 
 
-
-
 class Command(BaseCommand):
     help = "Seed the database with sample Companies, Users, Profiles, Requests, and Flags for the PA dashboard."
 
     def add_arguments(self, parser):
-        parser.add_argument("--companies", type=int, default=DEFAULT_COMPANIES, help="How many companies to create")
-        parser.add_argument("--pins", type=int, default=DEFAULT_PINS, help="How many PersonInNeed to create")
-        parser.add_argument("--cvs", type=int, default=DEFAULT_CVS, help="How many CVs to create")
-        parser.add_argument("--csrs", type=int, default=DEFAULT_CSRS, help="How many CSR reps to create")
-        parser.add_argument("--requests", type=int, default=DEFAULT_REQUESTS, help="How many requests to create")
+        parser.add_argument("--companies", type=int, default=DEFAULT_COMPANIES)
+        parser.add_argument("--pins", type=int, default=DEFAULT_PINS)
+        parser.add_argument("--cvs", type=int, default=DEFAULT_CVS)
+        parser.add_argument("--csrs", type=int, default=DEFAULT_CSRS)
+        parser.add_argument("--requests", type=int, default=DEFAULT_REQUESTS)
         parser.add_argument("--create_pa", action="store_true", help="Also create a PA admin user/profile")
 
     @transaction.atomic
@@ -224,11 +222,13 @@ class Command(BaseCommand):
         # -----------------------
         # 6) Requests
         # -----------------------
+        # Include REJECTED in the mix so your dashboard always shows some rejected items.
         status_weights = [
-            (RequestStatus.REVIEW, 25),
-            (RequestStatus.PENDING, 30),
-            (RequestStatus.ACTIVE, 25),
-            (RequestStatus.COMPLETE, 20),
+            (RequestStatus.REVIEW,   24),
+            (RequestStatus.PENDING,  28),
+            (RequestStatus.ACTIVE,   20),
+            (RequestStatus.COMPLETE, 18),
+            (RequestStatus.REJECTED, 10),
         ]
 
         requests = []
@@ -262,8 +262,16 @@ class Command(BaseCommand):
         # -----------------------
         # 7) Flags
         # -----------------------
+        # Create flags for ~1/3 of requests (skewed to REVIEW/PENDING)
+        candidate_requests = [r for r in requests if r.status in (RequestStatus.REVIEW, RequestStatus.PENDING)]
+        others = [r for r in requests if r.status not in (RequestStatus.REVIEW, RequestStatus.PENDING)]
+        chosen = set(random.sample(candidate_requests, k=min(len(candidate_requests), max(1, len(requests)//3))))
+        # sprinkle a few more from others
+        if others:
+            chosen.update(random.sample(others, k=min(len(others)//10, 5)))
+
         flag_count = 0
-        for req in random.sample(requests, k=max(1, len(requests) // 3)):
+        for req in chosen:
             is_manual = random.choice([True, False])
             if is_manual and csrs:
                 csr = random.choice(csrs)
@@ -271,23 +279,51 @@ class Command(BaseCommand):
                     request=req,
                     flag_type=FlagType.MANUAL,
                     csr=csr,
-                    reason="Manual review requested: wording needs redaction.",
+                    reasonbycsr=random.choice([
+                        "Manual review: wording needs redaction.",
+                        "Manual review: unclear appointment details.",
+                        "Manual review: mismatch with service category.",
+                    ]),
                 )
             else:
                 flag = FlaggedRequest.objects.create(
                     request=req,
                     flag_type=FlagType.AUTO,
                     csr=None,
-                    reason="Auto moderation: sensitive term detected.",
+                    reasonbycsr=random.choice([
+                        "Auto moderation: sensitive term detected.",
+                        "Auto moderation: potential PII found.",
+                        "Auto moderation: policy keyword matched.",
+                    ]),
                 )
             set_created(flag)
 
+            # Randomly resolve some flags (only if PA exists)
             if pa_profile and random.choice([True, False]):
                 flag.resolved = True
                 flag.resolved_by = pa_profile
-                flag.resolved_at = flag.created_at + timedelta(hours=random.randint(1, 48))
-                flag.resolution_notes = "Reviewed and cleared."
-                flag.save(update_fields=["resolved", "resolved_by", "resolved_at", "resolution_notes"])
+                # resolve 1–48 hours after created_at
+                resolved_at = flag.created_at + timedelta(hours=random.randint(1, 48))
+                flag.resolved_at = resolved_at
+
+                # Random outcome: Accept or Reject
+                outcome = random.choice([ResolutionOutcome.ACCEPTED, ResolutionOutcome.REJECTED])
+                flag.resolution_outcome = outcome
+                if outcome == ResolutionOutcome.ACCEPTED:
+                    flag.resolution_notes = "Accepted by PA: valid flag; proceed."
+                    # typical flow: REVIEW → PENDING if accepted
+                    if req.status == RequestStatus.REVIEW:
+                        req.status = RequestStatus.PENDING
+                        req.save(update_fields=["status"])
+                else:
+                    flag.resolution_notes = "Rejected by PA: invalid flag; request rejected."
+                    req.status = RequestStatus.REJECTED
+                    req.save(update_fields=["status"])
+
+                flag.save(update_fields=[
+                    "resolved", "resolved_by", "resolved_at",
+                    "resolution_outcome", "resolution_notes"
+                ])
 
             flag_count += 1
 
