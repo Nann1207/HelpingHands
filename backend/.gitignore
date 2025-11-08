@@ -1,0 +1,31 @@
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pdb
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Django stuff
+db.sqlite3
+*.log
+*.pot
+*.pyc
+media/
+staticfiles/
+
+# VS Code
+.vscode/
+
+# Mac system files
+.DS_Store
+
+# Node.js if present
+node_modules/
+
+# Environment variables
+.env
