@@ -50,15 +50,14 @@
         </a>
       </div>
 
-      <!-- Always-visible button when a receipt exists (image or not) -->
-      <a id="receiptBtn" href="#" target="_blank" rel="noopener noreferrer"
-         class="hidden inline-block px-3 py-1.5 rounded-md border hover:bg-gray-100">
-        View Invoice
-      </a>
-
       <div id="claimActions" class="flex items-center gap-2">
         <button id="btnVerify" class="px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700">Approve Claim</button>
         <button id="btnDispute" class="px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700">Report Dispute</button>
+        <!-- to show invoices -->
+        <a id="receiptBtn" href="#" target="_blank" rel="noopener noreferrer"
+          class="px-3 py-1.5 rounded-md bg-blue-800 text-white hover:bg-blue-900">
+        View Invoice
+       </a> 
       </div>
 
       <!-- Dispute form -->
@@ -73,6 +72,8 @@
         <textarea id="disputeComment" rows="4" class="border rounded-md p-2 w-full" placeholder="Describe the issue…"></textarea>
         <button id="submitDispute" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Submit Dispute</button>
       </form>
+
+
 
       <div id="claimMsg" class="text-sm"></div>
     </section>
