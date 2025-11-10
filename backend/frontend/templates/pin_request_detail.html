@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Request Details · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .kv .k { color:#6b7280 }  /* text-gray-500 */
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/pin_dashboard/" class="text-sm text-gray-600 hover:underline">← Back to Dashboard</a>
+      <div class="flex items-center gap-2">
+        <a id="openChat" href="/pin_chats/" class="hidden px-3 py-1.5 rounded-md border hover:bg-gray-100">Open Chat</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-8 space-y-6">
+    <h1 class="text-2xl font-bold">Request Details</h1>
+
+    <!-- Request card -->
+    <div id="card" class="rounded-xl border bg-white p-4 space-y-2">
+      <div class="text-sm text-gray-500">Loading…</div>
+    </div>
+
+    <!-- Claims (PIN verification/dispute) -->
+    <section id="claimBox" class="hidden rounded-xl border bg-white p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Verify Claim</h2>
+        <span id="claimStatusBadge" class="hidden text-xs px-2 py-0.5 rounded bg-gray-100"></span>
+      </div>
+
+      <div id="claimBody" class="text-sm text-gray-700">No claim submitted yet.</div>
+
+      <!-- Receipt preview (if image) -->
+      <div id="receiptWrap" class="hidden border rounded-lg overflow-hidden">
+        <a id="receiptLink" href="#" target="_blank" rel="noopener noreferrer" class="block">
+          <img id="receiptImg" alt="Receipt preview" class="max-h-72 w-full object-contain bg-gray-50" />
+        </a>
+      </div>
+
+      <!-- Always-visible button when a receipt exists (image or not) -->
+      <a id="receiptBtn" href="#" target="_blank" rel="noopener noreferrer"
+         class="hidden inline-block px-3 py-1.5 rounded-md border hover:bg-gray-100">
+        View Invoice
+      </a>
+
+      <div id="claimActions" class="flex items-center gap-2">
+        <button id="btnVerify" class="px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700">Approve Claim</button>
+        <button id="btnDispute" class="px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700">Report Dispute</button>
+      </div>
+
+      <!-- Dispute form -->
+      <form id="disputeForm" class="hidden space-y-2">
+        <select id="disputeReason" class="border rounded-md px-3 py-2 w-full">
+          <option value="">Select reason…</option>
+          <option value="incorrect_amount">Incorrect amount</option>
+          <option value="never_happened">Never happened</option>
+          <option value="incorrect_item">Incorrect item</option>
+          <option value="description_error">Description error</option>
+        </select>
+        <textarea id="disputeComment" rows="4" class="border rounded-md p-2 w-full" placeholder="Describe the issue…"></textarea>
+        <button id="submitDispute" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Submit Dispute</button>
+      </form>
+
+      <div id="claimMsg" class="text-sm"></div>
+    </section>
+  </main>
+
+  <script>
+    // ---------- Helpers ----------
+    function getReqIdFromPath(){
+      const parts = location.pathname.replace(/\/+$/,'').split("/").filter(Boolean);
+      // path looks like /pin_request/<REQ_ID>/
+      return parts[parts.length-1];
+    }
+    async function fetchJSON(url){
+      const r = await fetch(url, { credentials:"include" });
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      return r.json();
+    }
+    function getCookie(name){
+      const v = `; ${document.cookie}`.split(`; ${name}=`);
+      if (v.length===2) return v.pop().split(";").shift();
+    }
+    const csrftoken = getCookie("csrftoken");
+
+    // robust "safe" that keeps 0/0.00
+    function safe(val, fallback="—"){
+      return (val !== undefined && val !== null) ? val : fallback;
+    }
+    function titleCase(s){ return (s||"").replace(/_/g," ").replace(/\b\w/g, m => m.toUpperCase()); }
+    function looksLikeImage(url){ return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url||""); }
+
+    // ---------- Render Request ----------
+    function renderRequest(r){
+      const created  = (r.created_at||"").slice(0,10);
+      const apptDate = r.appointment_date || "";
+      const apptTime = (r.appointment_time||"").slice(0,5);
+      const html = `
+        <div class="grid grid-cols-2 gap-x-6 gap-y-2 kv">
+          <div class="k">Request ID</div><div class="font-medium">${safe(r.id)}</div>
+          <div class="k">Service Type</div><div>${safe(r.service_type)}</div>
+          <div class="k">Date Created</div><div>${safe(created)}</div>
+          <div class="k">Appointment Date</div><div>${safe(apptDate)}</div>
+          <div class="k">Time</div><div>${safe(apptTime)}</div>
+          <div class="k">Pickup Location</div><div>${safe(r.pickup_location)}</div>
+          <div class="k">Service Location</div><div>${safe(r.service_location)}</div>
+          <div class="k">Shortlisted</div><div>${safe(r.shortlist_count, 0)}</div>
+          <div class="k">Status</div><div class="capitalize">${safe(r.status)}</div>
+        </div>
+        ${r.description ? `<div class="pt-2 text-sm"><span class="k">Description</span><div>${r.description}</div></div>` : "" }
+      `;
+      document.getElementById("card").innerHTML = html;
+    }
+
+    // ---------- Claims (PIN) ----------
+    function renderClaim(cl){
+      const body = document.getElementById("claimBody");
+      const badge = document.getElementById("claimStatusBadge");
+      const receiptWrap = document.getElementById("receiptWrap");
+      const receiptLink = document.getElementById("receiptLink");
+      const receiptImg  = document.getElementById("receiptImg");
+      const receiptBtn  = document.getElementById("receiptBtn");
+
+      body.innerHTML = `
+        <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm kv">
+          <div class="k">Claim ID</div><div>${safe(cl.id)}</div>
+          <div class="k">Category</div><div>${titleCase(cl.category)}</div>
+          <div class="k">Expense Date</div><div>${safe(cl.expense_date)}</div>
+          <div class="k">Amount (SGD)</div><div>$ ${safe(cl.amount)}</div>
+          <div class="k">Payment Method</div><div>${titleCase(cl.payment_method)}</div>
+          <div class="k">Description</div><div>${safe(cl.description,'-')}</div>
+          <div class="k">Status</div><div>${titleCase(cl.status)}</div>
+        </div>
+      `;
+
+      const url = cl.receipt_url || cl.receipt || null;
+
+      if (url){
+        // Always give a button to open in new tab
+        receiptBtn.href = url;
+        receiptBtn.classList.remove("hidden");
+
+        // Show inline preview only for image-like URLs
+        if (looksLikeImage(url)){
+          receiptWrap.classList.remove("hidden");
+          receiptLink.href = url;
+          receiptImg.src = url;
+          receiptImg.alt = `Receipt ${cl.id}`;
+        } else {
+          receiptWrap.classList.add("hidden");
+        }
+      } else {
+        receiptWrap.classList.add("hidden");
+        receiptBtn.classList.add("hidden");
+      }
+
+      badge.textContent = titleCase(cl.status);
+      badge.classList.remove("hidden");
+    }
+
+    async function verifyClaim(claimId){
+      const r = await fetch(`/api/pin/claims/${encodeURIComponent(claimId)}/verify/`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRFToken": csrftoken }
+      });
+      return r.ok;
+    }
+
+    async function disputeClaim(claimId, reason, comment){
+      const r = await fetch(`/api/pin/claims/${encodeURIComponent(claimId)}/dispute/`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRFToken": csrftoken, "Content-Type":"application/json" },
+        body: JSON.stringify({ reason, comment })
+      });
+      return r.ok;
+    }
+
+    // ---------- Page Init ----------
+    async function load(){
+      const reqId = getReqIdFromPath();
+
+      // Get requests for this PIN (use lists per your API)
+      const complete = await fetchJSON(`/api/pin/my/requests/?status=complete`);
+      const active   = await fetchJSON(`/api/pin/my/requests/?status=active`);
+      const pending  = await fetchJSON(`/api/pin/my/requests/?status=pending`);
+      const req = [...complete, ...active, ...pending].find(x => x.id === reqId);
+
+      const card = document.getElementById("card");
+      if (!req){
+        card.innerHTML = `<div class="text-red-600">Request not found.</div>`;
+        return;
+      }
+      renderRequest(req);
+
+      // Show chat shortcut if there is an open chat for this request
+      try{
+        const chats = await fetchJSON(`/api/me/chats/?status=open`);
+        const has = (chats||[]).some(c => (c.request_id === reqId || c.request === reqId) && c.is_open);
+        if (has) document.getElementById("openChat").classList.remove("hidden");
+      }catch{ /* ignore */ }
+
+      // Claims section only for completed requests
+      if (req.status !== "complete") return;
+
+      // Load claims for this PIN and filter by this request
+      const claimsAll = await fetchJSON(`/api/pin/claims/`);
+      const myClaims = (claimsAll || []).filter(c => (c.request_id === reqId || c.request === reqId));
+
+      const box = document.getElementById("claimBox");
+      const body = document.getElementById("claimBody");
+      const actions = document.getElementById("claimActions");
+      const form = document.getElementById("disputeForm");
+      const msg = document.getElementById("claimMsg");
+      box.classList.remove("hidden");
+
+      if (!myClaims.length){
+        body.textContent = "No claim submitted yet.";
+        actions.classList.add("hidden");
+        form.classList.add("hidden");
+        return;
+      }
+
+      // Show the most recent claim for this request
+      myClaims.sort((a,b) => (a.created_at||"") < (b.created_at||"") ? 1 : -1);
+      const cl = myClaims[0];
+      renderClaim(cl);
+
+      // If already verified/disputed/finalized, hide actions and form
+      const lockedStatuses = ["verified_by_pin","disputed_by_pin","reimbursed_by_csr","rejected_by_csr"];
+      const locked = lockedStatuses.includes((cl.status||"").toLowerCase());
+      if (locked){
+        actions.classList.add("hidden");
+        form.classList.add("hidden");
+      }
+
+      // Wire actions
+      document.getElementById("btnVerify").onclick = async () => {
+        msg.textContent = "Verifying…"; msg.className = "text-sm text-gray-600";
+        const ok = await verifyClaim(cl.id);
+        if (ok){
+          msg.textContent = "Claim verified.";
+          msg.className = "text-sm text-green-700";
+          load();
+        } else {
+          msg.textContent = "Failed to verify claim.";
+          msg.className = "text-sm text-red-700";
+        }
+      };
+
+      document.getElementById("btnDispute").onclick = () => {
+        form.classList.remove("hidden");
+      };
+
+      document.getElementById("submitDispute").onclick = async () => {
+        const reason  = document.getElementById("disputeReason").value;
+        const comment = document.getElementById("disputeComment").value;
+        if (!reason){
+          msg.textContent = "Please select a reason.";
+          msg.className = "text-sm text-red-700";
+          return;
+        }
+        msg.textContent = "Submitting dispute…";
+        msg.className = "text-sm text-gray-600";
+        const ok = await disputeClaim(cl.id, reason, comment);
+        if (ok){
+          msg.textContent = "Dispute submitted.";
+          msg.className = "text-sm text-green-700";
+          load();
+        } else {
+          msg.textContent = "Failed to submit dispute.";
+          msg.className = "text-sm text-red-700";
+        }
+      };
+    }
+
+    window.addEventListener("DOMContentLoaded", load);
+  </script>
+</body>
+</html>

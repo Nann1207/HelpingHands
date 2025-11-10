@@ -257,6 +257,44 @@ class Request(models.Model):
 
     def __str__(self):
         return f"{self.id} [{self.status}] {self.service_type} for {self.pin.name}" #display object
+    
+
+class ShortlistedRequest(models.Model):
+
+    id = models.BigAutoField(primary_key=True)
+
+    csr = models.ForeignKey(
+        CSRRep,
+        on_delete=models.CASCADE,
+        related_name="shortlists",
+    )
+    request = models.ForeignKey(
+        Request,
+        on_delete=models.CASCADE,
+        related_name="shortlisted_by",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["csr", "request"],
+                name="uq_shortlist_csr_request"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["csr"]),
+            models.Index(fields=["request"]),
+            models.Index(fields=["-created_at"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Shortlist(csr={self.csr_id}, req={self.request_id})"
+
+
+
 
 
 #THIS IS FOR PA
@@ -417,12 +455,19 @@ class ClaimDispute(models.Model):
 #a reusable helper filter that helps us get “open” or “closed” chat rooms easily
 class ChatRoomQuerySet(models.QuerySet):
     def open(self):
-        now = timezone.now() #gets current time 
-        return self.filter(opens_at__lte=now, expires_at__gte=now) #this basically returns all chat rooms that are open right now
+        now = timezone.now()
+        return self.filter(
+            opens_at__lte=now
+        ).filter(
+            models.Q(expires_at__gte=now) | models.Q(expires_at__isnull=True)
+        )
 
     def closed(self):
         now = timezone.now()
-        return self.filter(models.Q(expires_at__lt=now) | models.Q(opens_at__gt=now)) #returns all chat rooms that are closed right now
+        return self.filter(
+            models.Q(expires_at__lt=now) | models.Q(opens_at__gt=now)
+        )
+
 
 
 #Custom manager to use the above queryset methods
@@ -472,10 +517,13 @@ class ChatRoom(models.Model): #every chat room is only a PIN and CV
     @property
     def is_open(self):
         now = timezone.now()
-        # =It will returns True if the current time is within the open and expiry window.
-        #if expires_at is still None, this will return False
-        # Basically to check if the chat is “active” (for messaging) or “expired”.
-        return bool(self.opens_at and self.expires_at and self.opens_at <= now <= self.expires_at)
+        if not self.opens_at:
+            return False
+        #Open if now >= opens_at, and either no expiry yet (Active) OR not past expires_at
+        if self.expires_at is None:
+            return now >= self.opens_at
+        return self.opens_at <= now <= self.expires_at
+
 
 
     def save(self, *args, **kwargs):

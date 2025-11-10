@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 
 from core.models import Request, RequestStatus, CV, ClaimStatus
 from core.entity.cv_entities import CvEntity
+from core.entity.cv_entities import CvEntity
 from core.Control.chat_controller import ChatController  # reuse complete flow
 
 class CvController:
@@ -72,3 +73,28 @@ class CvController:
         claim = CvEntity.create_claim_report(request=req, cv=cv, **payload)
         # notify CSR + PIN later (out of scope)
         return claim
+
+
+class CvClaimController:
+    @staticmethod
+    def create_claim(*, user, req_id, data, files):
+        req = get_object_or_404(Request, pk=req_id)
+        # ensure user is the assigned CV
+        if not hasattr(user, "cv") or user.cv.id != (req.cv_id or ""):
+            raise PermissionDenied("Not allowed.")
+        receipt = files.get("receipt")
+        if not receipt:
+            raise ValueError("Receipt file is required.")
+
+        # Normalized payload
+        payload = {
+            "request": req,
+            "cv": user.cv,
+            "category": data.get("category"),
+            "expense_date": data.get("expense_date"),
+            "amount": data.get("amount"),
+            "payment_method": data.get("payment_method"),
+            "description": data.get("description", ""),
+            "receipt": receipt,
+        }
+        return CvEntity.create_claim(**payload)

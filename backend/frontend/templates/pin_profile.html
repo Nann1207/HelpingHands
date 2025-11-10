@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Profile · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+<header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+    <a href="/pin_dashboard/" class="text-sm text-gray-600 hover:underline">← Back to Dashboard</a>
+    <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+      {% csrf_token %}
+      <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+        Log out
+      </button>
+    </form>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 py-8 space-y-6">
+  <h1 class="text-2xl font-bold">Profile</h1>
+
+  <div class="rounded-xl border bg-white p-4 space-y-3">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <label class="text-sm">Full Name <input id="name" class="border rounded-md px-3 py-2 w-full" /></label>
+      <label class="text-sm">Phone <input id="phone" class="border rounded-md px-3 py-2 w-full" /></label>
+      <label class="text-sm md:col-span-2">Home Address <input id="address" class="border rounded-md px-3 py-2 w-full" /></label>
+      <label class="text-sm">Preferred CV Gender
+        <select id="prefGender" class="border rounded-md px-3 py-2 w-full">
+          <option value="">—</option><option value="male">Male</option><option value="female">Female</option>
+        </select>
+      </label>
+      <label class="text-sm">Preferred CV Language
+        <select id="prefLang" class="border rounded-md px-3 py-2 w-full">
+          <option value="en">English</option><option value="zh">Chinese</option><option value="ta">Tamil</option><option value="ms">Malay</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="sendOtp" type="button" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
+      <input id="otpCode" maxlength="6" placeholder="Enter OTP" class="border rounded-md px-3 py-1.5 w-32" />
+      <button id="saveProfile" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Save Changes</button>
+    </div>
+    <div id="msg" class="text-sm"></div>
+  </div>
+
+  <div class="rounded-xl border bg-white p-4 space-y-3">
+    <h2 class="font-semibold">Change Password</h2>
+    <div class="flex items-center gap-2">
+      <button id="sendPwdOtp" type="button" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
+      <input id="pwdOtp" maxlength="6" placeholder="OTP" class="border rounded-md px-3 py-1.5 w-28" />
+      <input id="newPwd" type="password" placeholder="New password" class="border rounded-md px-3 py-1.5" />
+      <button id="changePwd" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Change</button>
+    </div>
+    <div id="pwdMsg" class="text-sm"></div>
+  </div>
+</main>
+
+<script>
+  function getCookie(name) {
+    const v = `; ${document.cookie}`; const p = v.split(`; ${name}=`);
+    if (p.length === 2) return p.pop().split(';').shift();
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  function pickErrorMessage(payload, fallback){
+    if (!payload || typeof payload !== "object") return fallback;
+    if (typeof payload.detail === "string") return payload.detail;
+    for (const value of Object.values(payload)){
+      if (typeof value === "string") return value;
+      if (Array.isArray(value) && value.length){
+        const first = value[0];
+        if (typeof first === "string") return first;
+        if (first && typeof first === "object"){
+          const nested = pickErrorMessage(first, fallback);
+          if (nested) return nested;
+        }
+      }
+      if (value && typeof value === "object"){
+        const nested = pickErrorMessage(value, fallback);
+        if (nested) return nested;
+      }
+    }
+    return fallback;
+  }
+
+  async function fetchJSON(url){
+    const r = await fetch(url, { credentials:"include" });
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    return r.json();
+  }
+  async function postJSON(url, body){
+    try{
+      const resp = await fetch(url, {
+        method:"POST",
+        credentials:"include",
+        headers:{ "X-CSRFToken": csrftoken, "Content-Type":"application/json" },
+        body: JSON.stringify(body)
+      });
+      let data = null;
+      try{ data = await resp.json(); }catch{}
+      return { ok: resp.ok, status: resp.status, data };
+    }catch(err){
+      return { ok: false, status: 0, data: { detail: err.message } };
+    }
+  }
+
+  // Naive load of current profile (use /api/auth/me/ if it exposes fields, else skip prefill)
+  async function prefill(){
+    try{
+      const me = await fetchJSON("/api/auth/me/");
+      document.getElementById("name").value = me.name ?? "";
+      document.getElementById("phone").value = me.phone ?? "";
+      document.getElementById("address").value = me.address ?? "";
+      if (me.preferred_cv_gender) document.getElementById("prefGender").value = me.preferred_cv_gender;
+      if (me.preferred_cv_language) document.getElementById("prefLang").value = me.preferred_cv_language;
+    }catch{}
+  }
+
+  document.getElementById("sendOtp").onclick = async (ev) => {
+    ev.preventDefault();
+    const r = await postJSON("/api/pin/profile/otp/start/", {});
+    const msg = document.getElementById("msg");
+    if (r.ok){ msg.textContent = "OTP sent to your email."; msg.className="text-green-700 text-sm"; }
+    else {
+      msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
+      msg.className="text-red-700 text-sm";
+    }
+  };
+
+  document.getElementById("saveProfile").onclick = async (ev) => {
+    ev.preventDefault();
+    const code = document.getElementById("otpCode").value.trim();
+    const fields = {
+      name: document.getElementById("name").value,
+      phone: document.getElementById("phone").value,
+      address: document.getElementById("address").value,
+      preferred_cv_gender: document.getElementById("prefGender").value,
+      preferred_cv_language: document.getElementById("prefLang").value,
+    };
+    const r = await postJSON("/api/pin/profile/otp/confirm/", { code, fields });
+    const msg = document.getElementById("msg");
+    if (r.ok){ msg.textContent = "Profile updated."; msg.className="text-green-700 text-sm"; }
+    else {
+      msg.textContent = pickErrorMessage(r.data, "Invalid OTP or save failed.");
+      msg.className="text-red-700 text-sm";
+    }
+  };
+
+  document.getElementById("sendPwdOtp").onclick = async (ev) => {
+    ev.preventDefault();
+    // reuse start endpoint but NOTE: your controller expects purpose=PASSWORD_CHANGE
+    // You can either add a dedicated start endpoint, or (quick demo) reuse profile start and seed a PASSWORD_CHANGE OTP in DB.
+    const r = await postJSON("/api/pin/password/otp/start/", {}); // or create /api/pin/password/otp/start
+    const msg = document.getElementById("pwdMsg");
+    if (r.ok){ msg.textContent = "OTP sent."; msg.className="text-green-700 text-sm"; }
+    else {
+      msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
+      msg.className="text-red-700 text-sm";
+    }
+  };
+
+  document.getElementById("changePwd").onclick = async (ev) => {
+    ev.preventDefault();
+    const code = document.getElementById("pwdOtp").value.trim();
+    const new_password = document.getElementById("newPwd").value;
+    const r = await postJSON("/api/pin/password/change/", { code, new_password });
+    const msg = document.getElementById("pwdMsg");
+    if (r.ok){ msg.textContent = "Password updated."; msg.className="text-green-700 text-sm"; }
+    else {
+      msg.textContent = pickErrorMessage(r.data, "Invalid OTP or error updating password.");
+      msg.className="text-red-700 text-sm";
+    }
+  };
+
+  window.addEventListener("DOMContentLoaded", prefill);
+</script>
+</body>
+</html>

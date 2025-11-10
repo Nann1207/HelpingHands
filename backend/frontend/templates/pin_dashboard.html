@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>My Requests · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/pin_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/>
+        </svg>
+        <span class="text-xl font-bold">Helping Hands (PIN)</span>
+      </a>
+      <nav class="flex items-center gap-2">
+        <a href="/pin_profile/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Profile</a>
+        <a href="/pin_create_request/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-800">Create Request</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <h1 class="text-2xl font-bold">My Requests</h1>
+
+    <!-- Tabs -->
+    <div class="flex items-center gap-3">
+      <button data-tab="pending"  class="tab px-3 py-1.5 rounded-md border bg-white">Pending</button>
+      <button data-tab="active"   class="tab px-3 py-1.5 rounded-md border">Active</button>
+      <button data-tab="complete" class="tab px-3 py-1.5 rounded-md border">Completed</button>
+    </div>
+
+    <!-- Table -->
+    <div class="rounded-xl border bg-white overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="px-3 py-2">Request ID</th>
+            <th class="px-3 py-2">Service Type</th>
+            <th class="px-3 py-2">Date Created</th>
+            <th class="px-3 py-2">Appointment Date</th>
+            <th class="px-3 py-2">Time</th>
+            <th class="px-3 py-2">Pickup Location</th>
+            <th class="px-3 py-2">Service Location</th>
+            <th class="px-3 py-2">Shortlisted</th>
+            <th class="px-3 py-2">Status</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <p id="statusLine" class="text-sm text-gray-500"></p>
+  </main>
+
+  <!-- Floating Chat Button -->
+  <a href="/pin_chats/"
+     class="fixed right-6 bottom-6 w-14 h-14 rounded-full bg-yellow-200 border flex items-center justify-center shadow">
+     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+             d="M8 10h8M8 14h5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+     </svg>
+  </a>
+
+  <script>
+    const rows = document.getElementById("rows");
+    const statusLine = document.getElementById("statusLine");
+    const tabs = document.querySelectorAll(".tab");
+    let current = "pending";
+
+    async function fetchJSON(url){
+      const r = await fetch(url, { credentials: "include" });
+      if (!r.ok) throw new Error("HTTP "+r.status);
+      return r.json();
+    }
+
+    function setActiveTab(name){
+      current = name;
+      tabs.forEach(t => {
+        if (t.dataset.tab === name) t.classList.add("bg-white","border-gray-900");
+        else t.classList.remove("bg-white","border-gray-900");
+      });
+    }
+
+    function rowHtml(r){
+      const created   = (r.created_at||"").slice(0,10);
+      const apptDate  = (r.appointment_date||"");
+      const apptTime  = (r.appointment_time||"").slice(0,5);
+      return `
+        <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${r.id}">
+          <td class="px-3 py-2 font-medium">${r.id}</td>
+          <td class="px-3 py-2">${r.service_type}</td>
+          <td class="px-3 py-2">${created}</td>
+          <td class="px-3 py-2">${apptDate}</td>
+          <td class="px-3 py-2">${apptTime}</td>
+          <td class="px-3 py-2">${r.pickup_location}</td>
+          <td class="px-3 py-2">${r.service_location}</td>
+          <td class="px-3 py-2 text-center">${r.shortlist_count ?? 0}</td>
+          <td class="px-3 py-2 capitalize">${r.status}</td>
+        </tr>`;
+    }
+
+    async function load(status){
+      setActiveTab(status);
+      rows.innerHTML = `<tr><td class="px-3 py-4 text-gray-500" colspan="9">Loading…</td></tr>`;
+
+      const data = await fetchJSON(`/api/pin/my/requests/?status=${encodeURIComponent(status)}`);
+      rows.innerHTML = (data||[]).map(rowHtml).join("") || 
+        `<tr><td class="px-3 py-4 text-gray-500" colspan="9">No requests.</td></tr>`;
+      statusLine.textContent = `Loaded ${data?.length || 0} ${status} requests`;
+
+      // click-to-detail
+      document.querySelectorAll("tbody#rows tr[data-id]").forEach(tr => {
+        tr.addEventListener("click", () => {
+          const id = tr.getAttribute("data-id");
+          location.href = `/pin_request/${id}/`;
+        });
+      });
+    }
+
+    tabs.forEach(t => t.addEventListener("click", () => load(t.dataset.tab)));
+
+    window.addEventListener("DOMContentLoaded", () => load(current));
+  </script>
+</body>
+</html>

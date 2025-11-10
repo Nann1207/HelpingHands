@@ -14,8 +14,24 @@ class ClaimCreateSerializer(serializers.ModelSerializer):
         fields = ["category", "expense_date", "amount", "payment_method", "description", "receipt"]
 
 class ClaimReportSerializer(serializers.ModelSerializer):
-    request_id = serializers.CharField(source="request.id", read_only=True)
+    receipt_url = serializers.SerializerMethodField()
+
     class Meta:
         model = ClaimReport
-        fields = ["id", "request_id", "category", "expense_date", "amount",
-                  "payment_method", "description", "status", "created_at"]
+        fields = [
+            "id", "request", "cv",
+            "category", "expense_date", "amount",
+            "payment_method", "description",
+            "status", "created_at", "updated_at",
+            "receipt_url",
+        ]
+
+    def get_receipt_url(self, obj):
+        try:
+            if obj.receipt:
+                request = self.context.get("request")
+                url = obj.receipt.url  
+                return request.build_absolute_uri(url) if request else url
+        except Exception:
+            pass
+        return None

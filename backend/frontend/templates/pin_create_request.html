@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create Help Request · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/pin_dashboard/" class="font-semibold hover:underline">← Back to My Requests</a>
+      <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+        {% csrf_token %}
+        <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+          Log out
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <h1 class="text-2xl font-bold">Create Help Request</h1>
+
+    <form id="f" class="rounded-xl border bg-white p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label class="text-sm text-gray-600">Service Type</label>
+        <select name="service_type" class="w-full border rounded-md px-3 py-2" required>
+          <option value="">Choose…</option>
+          <option>Healthcare</option><option>Therapy</option><option>Dialysis</option>
+          <option>Vaccination / Check-up</option><option>Mobility Assistance</option><option>Community Event</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm text-gray-600">Appointment Date</label>
+        <input type="date" name="appointment_date" class="w-full border rounded-md px-3 py-2" required />
+      </div>
+      <div>
+        <label class="text-sm text-gray-600">Appointment Time</label>
+        <input type="time" name="appointment_time" class="w-full border rounded-md px-3 py-2" required />
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-sm text-gray-600">Pickup Location</label>
+        <input name="pickup_location" class="w-full border rounded-md px-3 py-2" required/>
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-sm text-gray-600">Service Location</label>
+        <input name="service_location" class="w-full border rounded-md px-3 py-2" required/>
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-sm text-gray-600">Description of request</label>
+        <textarea name="description" rows="5" class="w-full border rounded-md p-2" placeholder="Describe your need…" required></textarea>
+      </div>
+
+      <div class="md:col-span-2 flex items-center justify-end gap-2">
+        <button type="button" id="cancel" class="px-3 py-2 rounded-md border hover:bg-gray-100">Cancel</button>
+        <button class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Submit Request</button>
+      </div>
+    </form>
+
+    <p id="note" class="text-sm text-gray-500"></p>
+  </main>
+
+  <script>
+    function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+    async function j(url,opts){const r=await fetch(url,{credentials:"include",...opts});if(!r.ok) throw new Error(await r.text());return r.json();}
+    const form = document.getElementById("f");
+    const note = document.getElementById("note");
+    document.getElementById("cancel").addEventListener("click",()=>location.href="/pin_dashboard/");
+
+    form.addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+      try{
+        const resp = await j("/api/pin/requests/", {
+          method:"POST",
+          headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},
+          body: JSON.stringify(payload)
+        });
+        note.textContent = "Request submitted. It may appear as Review or Pending depending on moderation.";
+        setTimeout(()=>location.href="/pin_dashboard/", 800);
+      }catch(err){
+        alert("Failed to submit: "+err.message);
+      }
+    });
+  </script>
+</body>
+</html>

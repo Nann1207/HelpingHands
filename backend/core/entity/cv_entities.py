@@ -22,3 +22,7 @@ class CvEntity:
     @transaction.atomic
     def create_claim_report(*, request: Request, cv: CV, **data) -> ClaimReport:
         return ClaimReport.objects.create(request=request, cv=cv, **data)
+    
+    @staticmethod
+    def create_claim(**kwargs) -> ClaimReport:
+        return ClaimReport.objects.create(**kwargs)
