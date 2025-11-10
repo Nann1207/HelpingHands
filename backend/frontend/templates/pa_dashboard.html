@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-
     /* lock chart panel height; let canvas flex within */
     #requestsChartWrap { height: 22rem; } /* ~ h-88 */
     #requestsChart { width: 100% !important; height: 100% !important; }
@@ -40,78 +39,83 @@
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
-    <!-- Greeting + Filters -->
     <section class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold">Platform Admin Dashboard</h1>
         <p class="text-gray-600" id="whoami">Checking session…</p>
       </div>
 
-      <!-- Range + granularity + Export -->
+      <!-- Export-->
       <div class="flex flex-wrap items-center gap-2">
-        <div class="flex items-center gap-2">
-          <label for="fromDate" class="text-sm text-gray-600">From</label>
-          <input id="fromDate" type="date" class="border rounded-md px-3 py-2" />
-        </div>
-        <div class="flex items-center gap-2">
-          <label for="toDate" class="text-sm text-gray-600">To</label>
-          <input id="toDate" type="date" class="border rounded-md px-3 py-2" />
-        </div>
-        <select id="granularity" class="border rounded-md px-3 py-2">
-          <option value="day" selected>Day</option>
-          <option value="week">Week</option>
-          <option value="month">Month</option>
-          <option value="year">Year</option>
-        </select>
-        <button id="applyBtn" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Apply</button>
-        <button id="resetBtn" class="px-3 py-2 rounded-md border hover:bg-gray-100">Reset</button>
-        <a id="exportLink" href="#" class="px-3 py-2 rounded-md border hover:bg-gray-100">Export CSV</a>
+        <a id="exportLink" href="#" class="px-3 py-2 rounded-md border hover:bg-gray-300">Export Request Statistics</a>
       </div>
     </section>
 
     <!-- KPI mini-cards -->
     <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="p-4 rounded-xl bg-white shadow-sm">
-        <div class="text-sm text-gray-500">Number of PIN</div>
+      
+      <div class="p-6 border border-black rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02] text-center">
+        <div class="text-sm font-bold text-gray-900 mb-2">Number of PINs</div>
         <div id="kpiPins" class="text-2xl font-bold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
-        <div class="text-sm text-gray-500">Number of CV</div>
+
+      <div class="p-6 border border-black rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02] text-center">
+        <div class="text-sm font-bold text-gray-900 mb-2">Number of CVs</div>
         <div id="kpiCVs" class="text-2xl font-bold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
-        <div class="text-sm text-gray-500">Number of CSR</div>
+      <div class="p-6 border border-black rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02] text-center">
+        <div class="text-sm font-bold text-gray-900 mb-2">Number of CSR Reps</div>
         <div id="kpiCSRs" class="text-2xl font-bold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
-        <div class="text-sm text-gray-500">Open Flags</div>
-        <div id="kpiOpenFlags" class="text-2xl font-bold">—</div>
-        <div class="text-xs text-gray-500">Resolved: <span id="kpiResolvedFlags">—</span></div>
+      <div class="p-6 border border-black rounded-2xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02] text-center">
+        <div class="text-sm font-bold text-gray-900 mb-2">Open Flags</div>
+        <div id="kpiOpenFlags" class="text-4xl font-extrabold text-gray-900 mb-1">—</div>
+        <div class="text-xs text-gray-600">Resolved: <span id="kpiResolvedFlags">—</span></div>
       </div>
     </section>
 
     <!-- Requests status mini-cards -->
     <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
-      <div class="p-4 rounded-xl bg-white shadow-sm">
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
         <div class="text-sm text-gray-500">Requests · Review</div>
         <div id="reqReview" class="text-xl font-semibold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
         <div class="text-sm text-gray-500">Requests · Pending</div>
         <div id="reqPending" class="text-xl font-semibold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
         <div class="text-sm text-gray-500">Requests · Rejected</div>
         <div id="reqRejected" class="text-xl font-semibold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
         <div class="text-sm text-gray-500">Requests · Active</div>
         <div id="reqActive" class="text-xl font-semibold">—</div>
       </div>
-      <div class="p-4 rounded-xl bg-white shadow-sm">
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
         <div class="text-sm text-gray-500">Requests · Completed</div>
         <div id="reqComplete" class="text-xl font-semibold">—</div>
       </div>
+    </section>
+
+    
+    <section class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-2">
+        <label for="fromDate" class="text-sm text-gray-600">From</label>
+        <input id="fromDate" type="date" placeholder="dd/mm/yyyy" class="border rounded-md px-3 py-2" />
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="toDate" class="text-sm text-gray-600">To</label>
+        <input id="toDate" type="date" placeholder="dd/mm/yyyy" class="border rounded-md px-3 py-2" />
+      </div>
+      <select id="granularity" class="border rounded-md px-3 py-2">
+        <option value="day">Day</option>
+        <option value="week">Week</option>
+        <option value="month" selected>Month</option>
+        <option value="year">Year</option>
+      </select>
+      <button id="applyBtn" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Apply</button>
+      <button id="resetBtn" class="px-3 py-2 rounded-md border hover:bg-gray-100">Reset</button>
     </section>
 
     <!-- Single, centered chart -->
@@ -120,9 +124,9 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <h2 class="font-semibold">Requests by Status</h2>
-            <span id="seriesRange" class="text-xs text-gray-500"></span>
+            <span id="seriesRange" class="text-xs text-gray-500 hidden"></span>
           </div>
-          <div class="text-right">
+          <div class="ext-right hidden">
             <div class="text-[10px] text-gray-500">API:</div>
             <div class="text-[11px]">
               <code id="apiCall" class="api">GET /api/admin/metrics/</code> 
@@ -207,10 +211,7 @@
       qs("#reqComplete").textContent = cards["Completed"] ?? "0";
     }
 
-
-
     async function loadMetrics(){
-
       const params = {
         granularity: granSel.value || "day",
         from: fromInput.value,  
@@ -261,8 +262,6 @@
           plugins: {
             legend: { position: "bottom" },
             tooltip: { callbacks: { footer: (items) => {
-
-              
               const lab = qs("#apiCall").textContent;
               return `Source: ${lab}`;
             }}}
