@@ -18,7 +18,7 @@ class CVBriefSerializer(serializers.ModelSerializer):
     class Meta:
         model = CV
         fields = ["id", "name", "gender", "main_language", "second_language", "service_category_preference"]
-
+# class for CV suggestion serializer
 class CVSuggestionSerializer(serializers.Serializer):
     id = serializers.CharField()
     name = serializers.CharField()
