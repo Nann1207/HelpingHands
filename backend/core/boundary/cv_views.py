@@ -10,6 +10,7 @@ from .cv_serializers import (
     ClaimCreateSerializer, ClaimReportSerializer
 )
 
+# Create Class
 class CvMyRequestsView(APIView):
     # GET /api/cv/requests/?status=active|complete
     def get(self, request):
