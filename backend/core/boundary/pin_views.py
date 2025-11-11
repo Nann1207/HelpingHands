@@ -16,7 +16,7 @@ from .cv_serializers import ClaimReportSerializer
 
 
 
-#When a PIN user wants to create a new service request. 
+#When a PIN user wants to create a new service request.
 class PinRequestCreateView(APIView):
     # POST /api/pin/requests/
     def post(self, request):
