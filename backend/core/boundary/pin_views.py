@@ -16,7 +16,7 @@ from .cv_serializers import ClaimReportSerializer
 
 
 
-#When a PIN user wants to create a new service request. 
+#When a PIN user wants to create a new service request.
 class PinRequestCreateView(APIView):
     # POST /api/pin/requests/
     def post(self, request):
@@ -28,7 +28,7 @@ class PinRequestCreateView(APIView):
 
 #To list all service requests made by PIN user, filtered by status.
 class PinMyRequestsView(APIView):
-    # GET /api/pin/requests/?status=review|pending|active|complete
+    # GET /api/pin/requests/?status=review|pending|active|complete.
     def get(self, request):
         status_param = request.query_params.get("status")
         qs = PinController.list_my_requests(user=request.user, status=status_param)
