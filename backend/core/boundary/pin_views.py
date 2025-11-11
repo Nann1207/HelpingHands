@@ -28,7 +28,7 @@ class PinRequestCreateView(APIView):
 
 #To list all service requests made by PIN user, filtered by status.
 class PinMyRequestsView(APIView):
-    # GET /api/pin/requests/?status=review|pending|active|complete.
+    # GET /api/pin/requests/?status=review|pending|active|complete
     def get(self, request):
         status_param = request.query_params.get("status")
         qs = PinController.list_my_requests(user=request.user, status=status_param)
