@@ -5,6 +5,9 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import JSONField 
+
 
 
 
@@ -241,6 +244,14 @@ class Request(models.Model):
     updated_at = models.DateTimeField(auto_now=True)       #set on every save
     completed_at = models.DateTimeField(blank=True, null=True)
 
+
+    committed_by_csr = models.ForeignKey(
+        "CSRRep", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="committed_requests",
+        help_text="CSR who committed this request for matching."
+    )
+    committed_at = models.DateTimeField(null=True, blank=True)
+
     def save(self, *args, **kwargs):
         # If status is COMPLETE and we haven't recorded the time yet, set it now
         if self.status == RequestStatus.COMPLETE and self.completed_at is None:
@@ -253,6 +264,7 @@ class Request(models.Model):
             models.Index(fields=["status"]),    #filter by status
             models.Index(fields=["appointment_date", "appointment_time"]), #filter by appointment datetime
             models.Index(fields=["pin"]),   #filter by PIN
+            models.Index(fields=["committed_by_csr", "status"]),
         ]
 
     def __str__(self):
@@ -562,3 +574,94 @@ class ChatMessage(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+
+class MatchQueueStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    ACTIVE  = "active", "Active"     # currently waiting on a CV response
+    FILLED  = "filled", "Filled"     # a CV accepted; request matched
+    EXHAUSTED = "exhausted", "Exhausted"  # all 3 declined/expired
+
+class MatchQueue(models.Model):
+    request = models.OneToOneField(Request, on_delete=models.CASCADE, related_name="match_queue")
+    cv1 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+")
+    cv2 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    cv3 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+
+    current_index = models.PositiveSmallIntegerField(default=1)  # 1,2,3
+    status = models.CharField(max_length=12, choices=MatchQueueStatus.choices, default=MatchQueueStatus.PENDING)
+
+    # timing window for current CV to respond
+    sent_at = models.DateTimeField(null=True, blank=True)
+    deadline = models.DateTimeField(null=True, blank=True)  # e.g., sent_at + 1 hour
+
+    def _get_current_cv(self):
+        return {1: self.cv1, 2: self.cv2, 3: self.cv3}.get(self.current_index)
+
+    def start(self, hours_to_respond: int = 1):
+        """Send to cv1 (logical send; controller actually notifies)."""
+        if self.status not in [MatchQueueStatus.PENDING, MatchQueueStatus.ACTIVE]:
+            return
+        self.status = MatchQueueStatus.ACTIVE
+        self.sent_at = timezone.now()
+        self.deadline = self.sent_at + timedelta(hours=hours_to_respond)
+        self.save()
+
+
+    def advance(self, hours_to_respond: int = 1) -> bool:
+        """Move to the next CV; returns True if advanced, False if exhausted."""
+        if self.current_index >= 3 or self._get_current_cv() is None:
+            self.status = MatchQueueStatus.EXHAUSTED
+            self.save()
+            return False
+        self.current_index += 1
+        self.sent_at = timezone.now()
+        self.deadline = self.sent_at + timedelta(hours=hours_to_respond)
+        self.save()
+        return True
+
+    def mark_filled(self):
+        self.status = MatchQueueStatus.FILLED
+        self.save()
+
+# --- Notifications (CSR-facing activity feed) ---
+
+class NotificationType(models.TextChoices):
+    OFFER_SENT      = "offer_sent",      "Offer sent to CV"
+    OFFER_DECLINED  = "offer_declined",  "CV declined"
+    OFFER_EXPIRED   = "offer_expired",   "CV did not respond (expired)"
+    QUEUE_ADVANCED  = "queue_advanced",  "Reassigned to next CV"
+    MATCH_ACCEPTED  = "match_accepted",  "CV accepted — match created"
+    MATCH_FILLED    = "match_filled",    "Queue filled (request active)"
+    QUEUE_STARTED   = "queue_started",   "Queue started"
+
+
+
+class Notification(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    # Who should see this
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+
+    # What happened
+    type = models.CharField(max_length=32, choices=NotificationType.choices)
+    message = models.CharField(max_length=300)
+
+    # Useful context to render clickable links in UI
+    request = models.ForeignKey(Request, on_delete=models.SET_NULL, null=True, blank=True)
+    cv = models.ForeignKey(CV, on_delete=models.SET_NULL, null=True, blank=True)
+    meta = JSONField(default=dict, blank=True)  # e.g. {"rank": 1, "expires_at": "..."} 
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "is_read"]),
+            models.Index(fields=["recipient", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.type}] -> {self.recipient_id} {self.message[:40]}"
