@@ -61,6 +61,7 @@
     </section>
   </main>
 
+  <!-- script for functions -->
   <script>
     async function jget(u){ const r=await fetch(u,{credentials:"include"}); if(!r.ok) throw new Error(r.status); return r.json(); }
     const ongoing = document.getElementById("ongoing");
