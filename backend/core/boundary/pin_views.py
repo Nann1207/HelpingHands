@@ -16,7 +16,7 @@ from .cv_serializers import ClaimReportSerializer
 
 
 
-#When a PIN user wants to create a new service request. 
+#When a PIN user wants to create a new service request.
 class PinRequestCreateView(APIView):
     # POST /api/pin/requests/
     def post(self, request):
@@ -93,7 +93,7 @@ class PinDisputeClaimView(APIView):
         except (PermissionDenied, ValidationError) as e:
             return Response({"detail": str(e)}, status=400)
 
-
+# View PinStartPassword
 class PinStartPasswordOTPView(APIView):
     # POST /api/pin/password/otp/start/
     def post(self, request):
