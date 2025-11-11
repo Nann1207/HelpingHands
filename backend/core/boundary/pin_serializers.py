@@ -1,7 +1,7 @@
 # core/boundary/pin_serializers.py
 from rest_framework import serializers
 from core.models import Request, ClaimReport
-
+# class for requestCreateSerializer
 class RequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Request
