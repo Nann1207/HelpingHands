@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Requests · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .table { width:100%; border-collapse: collapse }
+    .table th { text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem; }
+    .table td { padding:.6rem .75rem; border-top:1px solid #eee }
+    .pill { font-size:.7rem; padding:.1rem .4rem; border:1px solid #e5e7eb; border-radius:.5rem; color:#6b7280 }
+    .btn { padding:.35rem .6rem; border-radius:.5rem; border:1px solid #e5e7eb; }
+    .btn-primary { background:#111827; color:#fff; }
+    .heart { cursor:pointer; }
+    .heart.filled { color:#ef4444 }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; }
+    .modal { background:#fff; width:100%; max-width:42rem; border-radius:1rem; border:1px solid #e5e7eb; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_requests/" class="flex items-center gap-2">
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-2">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border bg-gray-900 text-white">Requests</a>
+        <a href="/csr_shortlisted/" class="px-3 py-1.5 rounded-md border">Shortlisted</a>
+        <a href="/csr_matching/" class="px-3 py-1.5 rounded-md border">Matching</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">{% csrf_token %}
+          <button class="px-3 py-1.5 rounded-md bg-red-500 text-white">Log out</button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <h1 class="text-2xl font-bold">Requests</h1>
+
+    <!-- Expiring soon -->
+    <section class="rounded-2xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="font-semibold">Requests Expiring Soon</h2>
+        <span id="soonCount" class="pill">—</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Request ID</th><th>Service Type</th><th>Date Created</th>
+              <th>Appointment Date</th><th>Time</th><th>Pickup Location</th><th>Service Location</th><th></th><th></th>
+            </tr>
+          </thead>
+          <tbody id="soonBody"><tr><td class="py-3 text-gray-500" colspan="9">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- All -->
+    <section class="rounded-2xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">All requests</h2>
+        <div class="flex items-center gap-2">
+          <input id="search" placeholder="Search …" class="border rounded-md px-3 py-2 w-64" />
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Request ID</th><th>Service Type</th><th>Date Created</th>
+              <th>Appointment Date</th><th>Time</th><th>Pickup Location</th><th>Service Location</th><th></th><th></th>
+            </tr>
+          </thead>
+          <tbody id="allBody"><tr><td class="py-3 text-gray-500" colspan="9">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Commit modal -->
+  <div id="commitModal" class="modal-backdrop">
+    <div class="modal p-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Select up to 3 volunteers</h3>
+        <button id="closeModal" class="btn">Close</button>
+      </div>
+      <div id="modalBody" class="mt-3">
+        <div class="text-sm text-gray-600">Loading suggestions…</div>
+      </div>
+      <div class="mt-4 flex items-center justify-end gap-2">
+        <button id="confirmCommit" class="btn btn-primary">Create queue & start</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ------- helpers -------
+    const byId = (id)=>document.getElementById(id);
+    const soonBody = byId("soonBody");
+    const allBody  = byId("allBody");
+    const searchEl = byId("search");
+
+    async function jget(u){ const r=await fetch(u,{credentials:"include"}); if(!r.ok) throw new Error(r.status); return r.json(); }
+    async function jpost(u,body){ const r=await fetch(u,{method:"POST",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+    function fmtTime(t){ return (t||"").slice(0,5); }
+    function withinDays(iso, days){
+      const d=new Date(iso); const now=new Date();
+      const diff=(d - now)/(1000*60*60*24); return diff>=0 && diff<=days;
+    }
+
+    function row(req){
+      const id=req.id, fav=`<button class="heart" data-id="${id}" title="Shortlist">❤</button>`;
+      const commit=`<button class="btn" data-commit="${id}">Commit</button>`;
+      return `<tr>
+        <td class="font-medium">${id}</td>
+        <td>${req.service_type}</td>
+        <td>${(req.created_at||"").slice(0,10)}</td>
+        <td>${req.appointment_date||""}</td>
+        <td>${fmtTime(req.appointment_time)}</td>
+        <td>${req.pickup_location||""}</td>
+        <td>${req.service_location||""}</td>
+        <td class="text-center">${fav}</td>
+        <td class="text-right">${commit}</td>
+      </tr>`;
+    }
+
+    let ALL=[], SOON=[];
+    async function load(){
+      const data = await jget("/api/csr/requests/pending/");
+      ALL = data||[];
+      const txt = (q)=>q.toLowerCase();
+
+      // soon = next 14 days
+      SOON = ALL.filter(r=> withinDays(r.appointment_date, 14))
+                .sort((a,b)=> (a.appointment_date<b.appointment_date? -1:1));
+      soonBody.innerHTML = SOON.length ? SOON.map(row).join("") : `<tr><td class="py-3 text-gray-500" colspan="9">None</td></tr>`;
+      byId("soonCount").textContent = `${SOON.length}`;
+
+      renderAll();
+    }
+
+    function renderAll(){
+      const q = (searchEl.value||"").trim().toLowerCase();
+      const arr = q ? ALL.filter(r =>
+        [r.id, r.service_type, r.pickup_location, r.service_location].join(" ").toLowerCase().includes(q)
+      ) : ALL;
+      allBody.innerHTML = arr.length ? arr.map(row).join("") : `<tr><td class="py-3 text-gray-500" colspan="9">No results.</td></tr>`;
+    }
+
+    // shortlist toggle
+    document.addEventListener("click", async (e)=>{
+      const t=e.target;
+      // shortlist
+      if(t.matches(".heart")){
+        const reqId=t.getAttribute("data-id");
+        const filled=t.classList.contains("filled");
+        try{
+          if(filled){
+            await fetch("/api/csr/shortlists/", {method:"DELETE",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:reqId})});
+            t.classList.remove("filled");
+          }else{
+            await jpost("/api/csr/shortlists/", {request_id:reqId});
+            t.classList.add("filled");
+          }
+        }catch{ alert("Failed to update shortlist."); }
+      }
+      // commit (open modal)
+      if(t.hasAttribute("data-commit")){
+        const id=t.getAttribute("data-commit");
+        openCommitModal(id);
+      }
+      if(t.id==="closeModal"){ closeCommitModal(); }
+      if(t.id==="confirmCommit"){ await confirmCommitFlow(); }
+    });
+
+    searchEl.addEventListener("input", renderAll);
+
+    // ------- commit modal & queue flow -------
+    const modal = byId("commitModal");
+    const modalBody = byId("modalBody");
+    let currentReq = null;
+    let selected = new Set();
+
+    function closeCommitModal(){ modal.style.display="none"; currentReq=null; selected.clear(); }
+    async function openCommitModal(reqId){
+      currentReq = reqId;
+      selected.clear();
+      modal.style.display="flex";
+      modalBody.innerHTML = `<div class="text-sm text-gray-600">Loading suggestions…</div>`;
+      try{
+        const sugg = await jget(`/api/csr/requests/${encodeURIComponent(reqId)}/suggestions/`);
+        modalBody.innerHTML = renderSuggestions(sugg);
+      }catch{
+        modalBody.innerHTML = `<div class="text-sm text-red-600">Failed to load suggestions.</div>`;
+      }
+    }
+
+    function renderSuggestions(list){
+      if(!list || !list.length) return `<div class="text-sm text-gray-600">No suggestions available.</div>`;
+      return `
+        <div class="text-xs text-gray-500 mb-2">Auto-suggested (pick up to 3)</div>
+        <div class="max-h-80 overflow-auto divide-y">
+          ${list.map(cv => `
+            <label class="flex items-center gap-3 p-2">
+              <input type="checkbox" class="cvpick" value="${cv.id}">
+              <div class="flex-1">
+                <div class="font-medium">${cv.name} <span class="text-gray-400">(${cv.id})</span></div>
+                <div class="text-xs text-gray-600">Pref: ${cv.service_category_preference} · Completed ${cv.completed_count} · Active ${cv.active_load} · Lang ${cv.main_language}${cv.second_language?"/"+cv.second_language:""}</div>
+              </div>
+              ${cv.svc_match ? '<span class="pill">service match</span>' : ''}
+            </label>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    modalBody.addEventListener("change",(e)=>{
+      if(!e.target.matches(".cvpick")) return;
+      const id=e.target.value;
+      if(e.target.checked){ selected.add(id); }
+      else { selected.delete(id); }
+      if(selected.size>3){
+        // uncheck this one
+        e.target.checked=false; selected.delete(id);
+        alert("Select at most 3 volunteers.");
+      }
+    });
+
+    async function confirmCommitFlow(){
+      if(!currentReq) return;
+      if(selected.size===0){ alert("Pick at least 1 volunteer."); return; }
+      try{
+        await jpost(`/api/csr/requests/${encodeURIComponent(currentReq)}/queue/`, { cv_ids: Array.from(selected) });
+        await jpost(`/api/csr/requests/${encodeURIComponent(currentReq)}/queue/start/`, { hours_to_respond: 1 });
+        closeCommitModal();
+        alert("Matching queue started.");
+      }catch(e){
+        alert("Failed to create/start queue.");
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", load);
+  </script>
+</body>
+</html>

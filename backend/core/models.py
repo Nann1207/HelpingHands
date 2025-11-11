@@ -1,9 +1,13 @@
-from datetime import timezone
+from django.utils import timezone
+from datetime import datetime, timedelta
 import uuid
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import JSONField 
+
 
 
 
@@ -238,6 +242,21 @@ class Request(models.Model):
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)   #set on create
     updated_at = models.DateTimeField(auto_now=True)       #set on every save
+    completed_at = models.DateTimeField(blank=True, null=True)
+
+
+    committed_by_csr = models.ForeignKey(
+        "CSRRep", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="committed_requests",
+        help_text="CSR who committed this request for matching."
+    )
+    committed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # If status is COMPLETE and we haven't recorded the time yet, set it now
+        if self.status == RequestStatus.COMPLETE and self.completed_at is None:
+            self.completed_at = timezone.now()
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-created_at"] #newest requests first
@@ -245,10 +264,49 @@ class Request(models.Model):
             models.Index(fields=["status"]),    #filter by status
             models.Index(fields=["appointment_date", "appointment_time"]), #filter by appointment datetime
             models.Index(fields=["pin"]),   #filter by PIN
+            models.Index(fields=["committed_by_csr", "status"]),
         ]
 
     def __str__(self):
         return f"{self.id} [{self.status}] {self.service_type} for {self.pin.name}" #display object
+    
+
+class ShortlistedRequest(models.Model):
+
+    id = models.BigAutoField(primary_key=True)
+
+    csr = models.ForeignKey(
+        CSRRep,
+        on_delete=models.CASCADE,
+        related_name="shortlists",
+    )
+    request = models.ForeignKey(
+        Request,
+        on_delete=models.CASCADE,
+        related_name="shortlisted_by",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["csr", "request"],
+                name="uq_shortlist_csr_request"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["csr"]),
+            models.Index(fields=["request"]),
+            models.Index(fields=["-created_at"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Shortlist(csr={self.csr_id}, req={self.request_id})"
+
+
+
 
 
 #THIS IS FOR PA
@@ -316,5 +374,294 @@ class FlaggedRequest(models.Model):
         return f"Flag {self.flag_type} on {self.request.id} by {who}"
 
 
+#THIS PART IS FOR CV AND PIN 
+
+#2 reasons why OTP is sent: profile update and password change
+class OtpPurpose(models.TextChoices):
+    PROFILE_UPDATE = "profile_update", "Profile Update"
+    PASSWORD_CHANGE = "password_change", "Password Change"
 
 
+
+#Each OTP sent to email is stored here
+class EmailOTP(models.Model):
+    email = models.EmailField() #The email the OTP is sent to
+    code = models.CharField(max_length=6) #The OTP code itself
+    purpose = models.CharField(max_length=30, choices=OtpPurpose.choices) #The purpose of the OTP
+    expires_at = models.DateTimeField() #When the OTP becomes invalid
+    consumed = models.BooleanField(default=False) #Marks if the OTP was already used (True = used, False = still valid).
+    created_at = models.DateTimeField(auto_now_add=True) #auto store time, when the OTP was created 
+
+    class Meta:
+        indexes = [models.Index(fields=["email", "purpose", "expires_at", "consumed"])] #Adds an index for faster lookup
+
+
+# --- Claim reporting by CV, with PIN dispute ---
+class ClaimCategory(models.TextChoices):
+    TRANSPORT = "transport", "Transportation"
+    FOOD = "food", "Food"
+    MEDS = "meds", "Medication"
+    APPOINTMENT = "appointment", "Appointment"
+    OTHER = "other", "Other"
+
+class PaymentMethod(models.TextChoices):
+    CASH = "cash", "Cash"
+    CARD = "card", "Card"
+    PAYNOW = "paynow", "Bank Paynow"
+    PAYLAH = "paylah", "DBS PayLah"
+
+class ClaimStatus(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    VERIFIED_BY_PIN = "verified_by_pin", "Verified by PIN"
+    DISPUTED_BY_PIN = "disputed_by_pin", "Disputed by PIN"
+    REJECTED_BY_CSR = "rejected_by_csr", "Rejected by CSR"  
+    REIMBURSED_BY_CSR = "reimbursed_by_csr", "Reimbursed by CSR"  
+
+
+def claimid():
+    return "CLM" + uuid.uuid4().hex[:8].upper() #Claim ID which is primary key
+
+class ClaimReport(models.Model):
+    id = models.CharField(max_length=11, 
+                          primary_key=True, 
+                          editable=False, 
+                          default=claimid, 
+                          unique=True)
+    
+    request = models.ForeignKey(Request, on_delete=models.CASCADE, related_name="claims") #Request being claimed for
+    cv = models.ForeignKey(CV, on_delete=models.CASCADE, related_name="claims") #CV making the claim
+
+    category = models.CharField(max_length=20, choices=ClaimCategory.choices) #Category of claim
+    expense_date = models.DateField() #Date of expense
+    amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)]) #Amount claimed
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)    #Payment method used
+    description = models.CharField(max_length=600, blank=True) #Description of claim
+    receipt = models.FileField(upload_to="receipts/", blank=False, null=False) #Receipt upload 
+    
+    status = models.CharField(max_length=20, choices=ClaimStatus.choices, default=ClaimStatus.SUBMITTED) #default is submitted
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+ 
+ #Category of dispute raised by PIN
+class DisputeReason(models.TextChoices):
+    INCORRECT_AMOUNT = "incorrect_amount", "Incorrect amount"
+    NEVER_HAPPENED = "never_happened", "Never happened"
+    INCORRECT_ITEM = "incorrect_item", "Incorrect item"
+    DESCRIPTION_ERROR = "description_error", "Description error"
+
+class ClaimDispute(models.Model):
+    claim = models.ForeignKey(ClaimReport, on_delete=models.CASCADE, related_name="disputes") #Each of the dispute is linked to a claim
+    pin = models.ForeignKey(PersonInNeed, on_delete=models.CASCADE, related_name="claim_disputes") #PIN raising the dispute
+    reason = models.CharField(max_length=50, choices=DisputeReason.choices) #Reason for dispute
+    comment = models.CharField(max_length=600, blank=True) #Additional comments by PIN
+    created_at = models.DateTimeField(auto_now_add=True) 
+
+
+
+#THIS SECTION IS FOR CHAT BETWEEN CV AND PIN
+
+
+
+#a reusable helper filter that helps us get “open” or “closed” chat rooms easily
+class ChatRoomQuerySet(models.QuerySet):
+    def open(self):
+        now = timezone.now()
+        return self.filter(
+            opens_at__lte=now
+        ).filter(
+            models.Q(expires_at__gte=now) | models.Q(expires_at__isnull=True)
+        )
+
+    def closed(self):
+        now = timezone.now()
+        return self.filter(
+            models.Q(expires_at__lt=now) | models.Q(opens_at__gt=now)
+        )
+
+
+
+#Custom manager to use the above queryset methods
+class ChatRoomManager(models.Manager):
+    def get_queryset(self):
+        return ChatRoomQuerySet(self.model, using=self._db) #returns the custom queryset
+    def open(self):
+        return self.get_queryset().open() #uses the open() method from the custom queryset
+    def closed(self):
+        return self.get_queryset().closed() #uses the closed() method from the custom queryset
+    
+
+
+
+def chatid():
+    return "CHAT" + uuid.uuid4().hex[:8].upper() #UNIQUE CHAT ID
+
+class ChatRoom(models.Model): #every chat room is only a PIN and CV
+    id = models.CharField(max_length=12, 
+                          primary_key=True, 
+                          editable=False, 
+                          default=chatid, 
+                          unique=True) #Chat Room ID
+    
+    request = models.OneToOneField(Request, 
+                                   on_delete=models.CASCADE, 
+                                   related_name="chat") #Each request has one chat room
+    
+
+    
+    opens_at = models.DateTimeField(blank=True, null=True)   #when chat opens (start of the appointment day)
+    expires_at = models.DateTimeField(blank=True, null=True) #when the chat should stop accepting messages.
+    created_at = models.DateTimeField(auto_now_add=True) #timestamp when the chat row was created.
+
+    # Attach the custom manager
+    objects = ChatRoomManager()
+
+    #Indexes to speed up query
+    class Meta:
+        indexes = [
+            models.Index(fields=["opens_at"]),
+            models.Index(fields=["expires_at"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+
+    @property
+    def is_open(self):
+        now = timezone.now()
+        if not self.opens_at:
+            return False
+        #Open if now >= opens_at, and either no expiry yet (Active) OR not past expires_at
+        if self.expires_at is None:
+            return now >= self.opens_at
+        return self.opens_at <= now <= self.expires_at
+
+
+
+    def save(self, *args, **kwargs):
+
+        #If opens_at is not set default to start of the appointment day
+        if not self.opens_at and self.request:
+            day_start = datetime.combine(self.request.appointment_date, datetime.min.time())
+
+            self.opens_at = timezone.make_aware(day_start) if timezone.is_naive(day_start) else day_start
+
+        #Savesss 
+        super().save(*args, **kwargs)
+
+
+    def __str__(self):
+        return f"ChatRoom {self.id} for Request {self.request_id}"
+    
+    @property
+    def cv(self):
+        return self.request.cv
+
+    @property
+    def pin(self):
+        return self.request.pin
+
+    
+
+#Each record is one message
+class ChatMessage(models.Model):
+
+    #Each message belongs to one ChatRoom.
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages") #Which chat room this message belongs to
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE) #Who sent the message either PIN or CV
+    body = models.TextField() #Message content
+    created_at = models.DateTimeField(auto_now_add=True) #when it was sent
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+
+class MatchQueueStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    ACTIVE  = "active", "Active"     # currently waiting on a CV response
+    FILLED  = "filled", "Filled"     # a CV accepted; request matched
+    EXHAUSTED = "exhausted", "Exhausted"  # all 3 declined/expired
+
+class MatchQueue(models.Model):
+    request = models.OneToOneField(Request, on_delete=models.CASCADE, related_name="match_queue")
+    cv1 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+")
+    cv2 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    cv3 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+
+    current_index = models.PositiveSmallIntegerField(default=1)  # 1,2,3
+    status = models.CharField(max_length=12, choices=MatchQueueStatus.choices, default=MatchQueueStatus.PENDING)
+
+    # timing window for current CV to respond
+    sent_at = models.DateTimeField(null=True, blank=True)
+    deadline = models.DateTimeField(null=True, blank=True)  # e.g., sent_at + 1 hour
+
+    def _get_current_cv(self):
+        return {1: self.cv1, 2: self.cv2, 3: self.cv3}.get(self.current_index)
+
+    def start(self, hours_to_respond: int = 1):
+        """Send to cv1 (logical send; controller actually notifies)."""
+        if self.status not in [MatchQueueStatus.PENDING, MatchQueueStatus.ACTIVE]:
+            return
+        self.status = MatchQueueStatus.ACTIVE
+        self.sent_at = timezone.now()
+        self.deadline = self.sent_at + timedelta(hours=hours_to_respond)
+        self.save()
+
+
+    def advance(self, hours_to_respond: int = 1) -> bool:
+        """Move to the next CV; returns True if advanced, False if exhausted."""
+        if self.current_index >= 3 or self._get_current_cv() is None:
+            self.status = MatchQueueStatus.EXHAUSTED
+            self.save()
+            return False
+        self.current_index += 1
+        self.sent_at = timezone.now()
+        self.deadline = self.sent_at + timedelta(hours=hours_to_respond)
+        self.save()
+        return True
+
+    def mark_filled(self):
+        self.status = MatchQueueStatus.FILLED
+        self.save()
+
+# --- Notifications (CSR-facing activity feed) ---
+
+class NotificationType(models.TextChoices):
+    OFFER_SENT      = "offer_sent",      "Offer sent to CV"
+    OFFER_DECLINED  = "offer_declined",  "CV declined"
+    OFFER_EXPIRED   = "offer_expired",   "CV did not respond (expired)"
+    QUEUE_ADVANCED  = "queue_advanced",  "Reassigned to next CV"
+    MATCH_ACCEPTED  = "match_accepted",  "CV accepted — match created"
+    MATCH_FILLED    = "match_filled",    "Queue filled (request active)"
+    QUEUE_STARTED   = "queue_started",   "Queue started"
+
+
+
+class Notification(models.Model):
+    id = models.BigAutoField(primary_key=True)
+
+    # Who should see this
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+
+    # What happened
+    type = models.CharField(max_length=32, choices=NotificationType.choices)
+    message = models.CharField(max_length=300)
+
+    # Useful context to render clickable links in UI
+    request = models.ForeignKey(Request, on_delete=models.SET_NULL, null=True, blank=True)
+    cv = models.ForeignKey(CV, on_delete=models.SET_NULL, null=True, blank=True)
+    meta = JSONField(default=dict, blank=True)  # e.g. {"rank": 1, "expires_at": "..."} 
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "is_read"]),
+            models.Index(fields=["recipient", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.type}] -> {self.recipient_id} {self.message[:40]}"

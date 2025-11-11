@@ -166,6 +166,7 @@ class ProfileEntity:
             "total_csrs": CSRRep.objects.count(),
         }
 
+
     @staticmethod
     def new_by_bucket(Model, dr: DateRange, trunc_fn): #This filter only records that were created within the date range
 

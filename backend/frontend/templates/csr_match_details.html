@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Match Details · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .cvcard{border:1px solid #e5e7eb;border-radius:.75rem;padding:.75rem}
+    .slot{border:1px dashed #e5e7eb;border-radius:.75rem;padding:.5rem .75rem; min-height:64px}
+    .btn{ padding:.4rem .7rem; border:1px solid #e5e7eb; border-radius:.5rem}
+    .btn-primary{ background:#111827; color:#fff }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_matching/" class="text-sm text-gray-600 hover:underline">← Back to Matching</a>
+      <div class="flex items-center gap-2">
+        <button id="removeBtn" class="btn border-red-300 text-red-600">Remove from List</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <h1 class="text-2xl font-bold">Match Details</h1>
+
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Request summary -->
+      <div class="lg:col-span-2 rounded-2xl border bg-white p-4">
+        <h2 class="font-semibold mb-3">Request</h2>
+        <div id="reqCard" class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <div class="text-gray-500">Loading…</div>
+        </div>
+
+        <h3 class="mt-6 font-semibold">Selected Matches <span class="text-xs text-gray-500">1 - Pending | 2 - Standby | 3 - Standby</span></h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+          <div class="slot" data-slot="1"></div>
+          <div class="slot" data-slot="2"></div>
+          <div class="slot" data-slot="3"></div>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <button id="startBtn" class="btn btn-primary">Create queue & start</button>
+          <span id="msg" class="text-sm"></span>
+        </div>
+      </div>
+
+      <!-- Suggestions -->
+      <div class="rounded-2xl border bg-white p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-semibold">List of Volunteers</h2>
+          <input id="q" placeholder="Search …" class="border rounded-md px-2 py-1.5 w-40" />
+        </div>
+        <div class="text-xs text-gray-500 mb-2">Auto-suggested</div>
+        <div id="list" class="space-y-2 max-h-[28rem] overflow-auto">
+          <div class="text-sm text-gray-600">Loading…</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Expect path /csr_match_details/<REQ_ID>/
+    function reqIdFromPath(){
+      const parts = location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);
+      return parts[parts.length-1];
+    }
+    const REQ_ID = reqIdFromPath();
+
+    const reqCard = document.getElementById("reqCard");
+    const list = document.getElementById("list");
+    const q = document.getElementById("q");
+    const slots = Array.from(document.querySelectorAll(".slot"));
+    const msg = document.getElementById("msg");
+
+    async function jget(u){ const r=await fetch(u,{credentials:"include"}); if(!r.ok) throw new Error(r.status); return r.json(); }
+    async function jpost(u,b){ const r=await fetch(u,{method:"POST",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+    let SUGG=[]; let PICK=[]; // PICK = array length 0..3 (ids)
+
+    function renderReq(r){
+      reqCard.innerHTML = `
+        <div class="text-gray-500">Request ID</div><div class="font-medium">${r.id}</div>
+        <div class="text-gray-500">Name</div><div>${r.pin_name||"-"}</div>
+        <div class="text-gray-500">Gender</div><div>${r.pin_gender||"-"}</div>
+        <div class="text-gray-500">Service Type</div><div>${r.service_type}</div>
+        <div class="text-gray-500">Description</div><div>${r.description||"-"}</div>
+        <div class="text-gray-500">Date Created</div><div>${(r.created_at||"").slice(0,10)}</div>
+        <div class="text-gray-500">Appointment Date</div><div>${r.appointment_date||""}</div>
+        <div class="text-gray-500">Time</div><div>${(r.appointment_time||"").slice(0,5)}</div>
+        <div class="text-gray-500">Pickup Location</div><div>${r.pickup_location||""}</div>
+        <div class="text-gray-500">Service Location</div><div>${r.service_location||""}</div>
+        <div class="text-gray-500">Status</div><div class="capitalize">${r.status}</div>
+      `;
+    }
+
+    function drawList(arr){
+      list.innerHTML = arr.length ? arr.map(cv=>`
+        <div class="cvcard flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-yellow-200 flex items-center justify-center text-xs">Pic</div>
+          <div class="flex-1">
+            <div class="font-medium">${cv.name} <span class="text-gray-400">(${cv.id})</span></div>
+            <div class="text-xs text-gray-600">Pref ${cv.service_category_preference} · Completed ${cv.completed_count} · Active ${cv.active_load} · Lang ${cv.main_language}${cv.second_language?"/"+cv.second_language:""}</div>
+          </div>
+          <button class="btn" data-add="${cv.id}">Select</button>
+        </div>
+      `).join("") : `<div class="text-sm text-gray-600">No volunteers.</div>`;
+    }
+
+    function drawSlots(){
+      slots.forEach((el,i)=>{
+        const id = PICK[i];
+        if(!id){ el.innerHTML = `<div class="text-sm text-gray-400">Empty</div>`; return; }
+        const cv = SUGG.find(x=>x.id===id);
+        el.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-medium">${cv?.name||id} <span class="text-gray-400">(${id})</span></div>
+              <div class="text-xs text-gray-600">Pref ${cv?.service_category_preference||"-"} · Completed ${cv?.completed_count||0} · Active ${cv?.active_load||0}</div>
+            </div>
+            <button class="btn" data-rem="${id}">🗑</button>
+          </div>
+        `;
+      });
+    }
+
+    document.addEventListener("click", async (e)=>{
+      const t=e.target;
+      if(t.hasAttribute("data-add")){
+        const id=t.getAttribute("data-add");
+        if(PICK.includes(id)) return;
+        if(PICK.length>=3){ alert("Max 3 selected."); return; }
+        PICK.push(id); drawSlots();
+      }
+      if(t.hasAttribute("data-rem")){
+        const id=t.getAttribute("data-rem");
+        PICK = PICK.filter(x=>x!==id); drawSlots();
+      }
+      if(t.id==="startBtn"){
+        if(PICK.length===0){ msg.textContent="Pick at least 1."; msg.className="text-sm text-red-600"; return; }
+        try{
+          await jpost(`/api/csr/requests/${encodeURIComponent(REQ_ID)}/queue/`, {cv_ids:PICK});
+          await jpost(`/api/csr/requests/${encodeURIComponent(REQ_ID)}/queue/start/`, {hours_to_respond:1});
+          msg.textContent="Queue created and started."; msg.className="text-sm text-green-700";
+        }catch{ msg.textContent="Failed to start queue."; msg.className="text-sm text-red-600"; }
+      }
+    });
+
+    q.addEventListener("input", ()=>{
+      const s=(q.value||"").toLowerCase();
+      drawList( s ? SUGG.filter(cv => `${cv.id} ${cv.name} ${cv.service_category_preference}`.toLowerCase().includes(s)) : SUGG );
+    });
+
+    async function load(){
+      const listPending = await fetch("/api/csr/requests/pending/", {credentials:"include"});
+      const all = listPending.ok ? await listPending.json() : [];
+      const req = all.find(x=>x.id===REQ_ID);
+      if(!req){ reqCard.innerHTML = `<div class="text-red-600">Request ${REQ_ID} not found.</div>`; return; }
+      renderReq(req);
+      SUGG = await (await fetch(`/api/csr/requests/${encodeURIComponent(REQ_ID)}/suggestions/`,{credentials:"include"})).json();
+      drawList(SUGG); drawSlots();
+    }
+    window.addEventListener("DOMContentLoaded", load);
+  </script>
+</body>
+</html>

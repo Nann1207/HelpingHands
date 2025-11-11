@@ -17,3 +17,14 @@ def pa_dashboard_page(request):
 @role_required("ADMIN")
 def pa_flags_page(request):
     return render(request, "pa_flags.html")
+
+
+def pin_dashboard_page(request): return render(request, "pin_dashboard.html")
+
+def pin_request_detail_page(request, req_id): return render(request, "pin_request_detail.html")
+
+def pin_profile_page(request): return render(request, "pin_profile.html")
+
+def pin_create_request_page(request): return render(request, "pin_create_request.html")
+
+def pin_chats_page(request): return render(request, "pin_chats.html")

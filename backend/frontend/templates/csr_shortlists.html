@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Shortlisted · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .table { width:100%; border-collapse: collapse }
+    .table th { text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem; }
+    .table td { padding:.6rem .75rem; border-top:1px solid #eee }
+    .btn { padding:.35rem .6rem; border-radius:.5rem; border:1px solid #e5e7eb; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_requests/" class="text-xl font-bold">Helping Hands (CSR)</a>
+      <nav class="flex items-center gap-2">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border">Requests</a>
+        <a href="/csr_shortlisted/" class="px-3 py-1.5 rounded-md border bg-gray-900 text-white">Shortlisted</a>
+        <a href="/csr_matching/" class="px-3 py-1.5 rounded-md border">Matching</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <h1 class="text-2xl font-bold">Shortlisted</h1>
+    <section class="rounded-2xl border bg-white p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-gray-600"><span id="count">—</span> requests shortlisted</div>
+        <input id="q" placeholder="Search …" class="border rounded-md px-3 py-2 w-64" />
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Request ID</th><th>Service Type</th><th>Date Created</th>
+              <th>Appointment Date</th><th>Time</th><th>Pickup Location</th><th>Service Location</th><th></th><th></th>
+            </tr>
+          </thead>
+          <tbody id="body"><tr><td class="py-3 text-gray-500" colspan="9">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- (reuses the commit modal from Requests page) -->
+  <div id="commitModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+    <div class="bg-white w-full max-w-2xl border rounded-xl p-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Select up to 3 volunteers</h3>
+        <button id="closeModal" class="btn">Close</button>
+      </div>
+      <div id="modalBody" class="mt-3 text-sm text-gray-600">Loading…</div>
+      <div class="mt-4 flex items-center justify-end gap-2">
+        <button id="confirmCommit" class="btn bg-gray-900 text-white">Create queue & start</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const body = document.getElementById("body");
+    const q = document.getElementById("q");
+    const count = document.getElementById("count");
+    async function jget(u){ const r=await fetch(u,{credentials:"include"}); if(!r.ok) throw new Error(r.status); return r.json(); }
+    async function jpost(u,b){ const r=await fetch(u,{method:"POST",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+    let ALL=[]; let currentReq=null; let selected=new Set();
+
+    function draw(arr){
+      body.innerHTML = arr.length ? arr.map(r => `
+        <tr>
+          <td class="font-medium">${r.id}</td>
+          <td>${r.service_type}</td>
+          <td>${(r.created_at||"").slice(0,10)}</td>
+          <td>${r.appointment_date||""}</td>
+          <td>${(r.appointment_time||"").slice(0,5)}</td>
+          <td>${r.pickup_location||""}</td>
+          <td>${r.service_location||""}</td>
+          <td class="text-center"><button class="px-2" data-remove="${r.id}" title="Remove">❤️</button></td>
+          <td class="text-right"><button class="btn" data-commit="${r.id}">Commit</button></td>
+        </tr>
+      `).join("") : `<tr><td class="py-3 text-gray-500" colspan="9">Nothing shortlisted.</td></tr>`;
+      count.textContent = arr.length;
+    }
+    function filt(){
+      const s=(q.value||"").toLowerCase();
+      const arr = s ? ALL.filter(r => [r.id,r.service_type,r.pickup_location,r.service_location].join(" ").toLowerCase().includes(s)) : ALL;
+      draw(arr);
+    }
+
+    async function load(){
+      ALL = await jget("/api/csr/shortlists/");
+      draw(ALL);
+    }
+
+    document.addEventListener("click", async (e)=>{
+      const t=e.target;
+      if(t.hasAttribute("data-remove")){
+        const id=t.getAttribute("data-remove");
+        await fetch("/api/csr/shortlists/", {method:"DELETE",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:id})});
+        ALL = ALL.filter(x=>x.id!==id); filt();
+      }
+      if(t.hasAttribute("data-commit")){
+        currentReq=t.getAttribute("data-commit");
+        openModal();
+      }
+      if(t.id==="closeModal") closeModal();
+      if(t.id==="confirmCommit") await doCommit();
+    });
+    q.addEventListener("input", filt);
+
+    // modal/commit
+    const modal=document.getElementById("commitModal");
+    const modalBody=document.getElementById("modalBody");
+    function openModal(){
+      selected.clear();
+      modal.classList.remove("hidden");
+      modalBody.innerHTML="Loading…";
+      jget(`/api/csr/requests/${encodeURIComponent(currentReq)}/suggestions/`).then(list=>{
+        modalBody.innerHTML = list.map(cv=>`
+          <label class="flex items-center gap-3 p-2 border-b">
+            <input type="checkbox" class="pick" value="${cv.id}">
+            <div class="flex-1">
+              <div class="font-medium">${cv.name} <span class="text-gray-400">(${cv.id})</span></div>
+              <div class="text-xs text-gray-600">Pref ${cv.service_category_preference} · Completed ${cv.completed_count} · Active ${cv.active_load}</div>
+            </div>
+            ${cv.svc_match?'<span class="text-xs px-2 py-0.5 rounded border">service match</span>':''}
+          </label>
+        `).join("") || `<div class="text-sm text-gray-600">No suggestions.</div>`;
+      }).catch(()=> modalBody.innerHTML=`<div class="text-sm text-red-600">Failed to load suggestions.</div>`);
+    }
+    function closeModal(){ modal.classList.add("hidden"); currentReq=null; selected.clear(); }
+    modalBody.addEventListener("change",(e)=>{
+      if(!e.target.matches(".pick")) return;
+      const id=e.target.value;
+      if(e.target.checked) selected.add(id); else selected.delete(id);
+      if(selected.size>3){ e.target.checked=false; selected.delete(id); alert("Max 3."); }
+    });
+    async function doCommit(){
+      if(!currentReq || selected.size===0){ alert("Pick at least 1."); return; }
+      try{
+        await jpost(`/api/csr/requests/${encodeURIComponent(currentReq)}/queue/`, {cv_ids:Array.from(selected)});
+        await jpost(`/api/csr/requests/${encodeURIComponent(currentReq)}/queue/start/`, {hours_to_respond:1});
+        closeModal();
+        alert("Queue started.");
+      }catch{ alert("Failed to start queue."); }
+    }
+
+    window.addEventListener("DOMContentLoaded", load);
+  </script>
+</body>
+</html>
