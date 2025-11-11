@@ -28,7 +28,7 @@ class AdminMetricsView(APIView):
         return Response(data, status=status.HTTP_200_OK) #converts your Python dict data into JSON.  HTTP status code 200 means sucess
 
 
-# 
+# This is for Admin Flags view
 class AdminFlagsListView(APIView):
     permission_classes = [IsAuthenticated, IsPlatformAdmin] #The user must be logged in and a PA
 
