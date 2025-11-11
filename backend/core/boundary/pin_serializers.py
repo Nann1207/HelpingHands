@@ -1,7 +1,7 @@
 # core/boundary/pin_serializers.py
 from rest_framework import serializers
 from core.models import Request, ClaimReport
-
+# class for requestCreateSerializer
 class RequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Request
@@ -14,7 +14,7 @@ class RequestListSerializer(serializers.ModelSerializer):
         model = Request
         fields = ["id", "status", "service_type", "appointment_date", "appointment_time",
                   "pickup_location", "service_location", "created_at", "completed_at","shortlist_count",]
-
+# class OtpCodeSerializer
 class OtpCodeSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=6)
 
