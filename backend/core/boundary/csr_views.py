@@ -24,7 +24,7 @@ class CSRRequestListSerializer(serializers.ModelSerializer):
             "description", "created_at", "shortlist_count",
         ]
 
-
+# class for CV suggestion serializer
 class CVSuggestionSerializer(serializers.Serializer):
     id = serializers.CharField()
     name = serializers.CharField()
