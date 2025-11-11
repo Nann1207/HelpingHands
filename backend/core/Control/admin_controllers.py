@@ -19,7 +19,7 @@ from core.entity.admin_entities import (
     RequestEntity, ProfileEntity, FlagEntity
 )
 
-
+#This is AdminMetricsController
 class AdminMetricsController:
 
     #To get the metrics for the dashboard
