@@ -14,7 +14,7 @@ class RequestListSerializer(serializers.ModelSerializer):
         model = Request
         fields = ["id", "status", "service_type", "appointment_date", "appointment_time",
                   "pickup_location", "service_location", "created_at", "completed_at","shortlist_count",]
-
+# class OtpCodeSerializer
 class OtpCodeSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=6)
 
