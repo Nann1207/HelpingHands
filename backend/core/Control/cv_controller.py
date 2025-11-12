@@ -3,7 +3,7 @@ import json
 from datetime import date
 from typing import Dict, Any
 
-import requests
+
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -117,7 +117,7 @@ class CvController:
         # Try remote if configured; fallback to rules if not or on failure
         if api_key and endpoint:
             try:
-                resp = requests.post(
+                resp = Request.post(
                     endpoint.rstrip("/") + "/v1/tips",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                     data=json.dumps(prompt),
