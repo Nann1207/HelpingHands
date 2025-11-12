@@ -2,6 +2,10 @@
 __pycache__/
 *.py[codz]
 *$py.class
+boundary/__pycache__/
+/Users/niruba/Desktop/HelpingHands/backend/frontend/__pycache__
+/Users/niruba/Desktop/HelpingHands/backend/core/boundary/__pycache__
+backend/core/__pycache__
 
 # C extensions
 *.so
