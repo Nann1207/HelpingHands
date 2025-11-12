@@ -4,3 +4,4 @@ backend/core/Control/__pycache__/csr_controller.cpython-312.pyc
 backend/frontend/__pycache__/urls.cpython-312.pyc
 backend/frontend/__pycache__/views.cpython-312.pyc
 backend/core/boundary/__pycache__/csr_views.cpython-312.pyc
+*.pyc
