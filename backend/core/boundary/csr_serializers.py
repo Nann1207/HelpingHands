@@ -1,6 +1,6 @@
 # core/Boundary/serializers_csr.py
 """
-Serializers for CSR (Corporate Social Responsibility) features.
+Serializers for CSR  features.
 Used by csr_views to read/write Request, Shortlist, MatchQueue, Claim, and Notification data.
 """
 

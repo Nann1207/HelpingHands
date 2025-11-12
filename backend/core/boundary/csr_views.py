@@ -252,8 +252,8 @@ class CSRCompletedClaimsView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
     def get(self, request, request_id: str):
-        data = CSRCompletedController.claims(request_id)  # {"claims":[...]}
-        return Response(ClaimReportSerializer(data["claims"], many=True).data, status=status.HTTP_200_OK)
+        claims = CSRCompletedController.claims(request_id)
+        return Response(ClaimReportSerializer(claims, many=True).data, status=status.HTTP_200_OK)
 
 
 class CSRClaimDecisionView(APIView):

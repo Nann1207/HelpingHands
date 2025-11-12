@@ -19,7 +19,7 @@ urlpatterns = [
     path("csr_requests/", pages.csr_requests_page, name="csr_requests_page"),
     path("csr_shortlist/", pages.csr_shortlist_page, name="csr_shortlist_page"),
     path("csr_match/", pages.csr_match_page, name="csr_match_page"),
+    path("csr_claims/", pages.csr_claims_page, name="csr_claims_page"),
     path("csr_match_detail/<str:req_id>/", pages.csr_match_detail_page, name="csr_match_detail_page"),
 ]
-
 

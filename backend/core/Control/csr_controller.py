@@ -254,21 +254,8 @@ class CSRCompletedController:
         return {"items": [{"id": r.id, "pin": r.pin.name, "cv": r.cv.name if r.cv else None} for r in qs]}
 
     @staticmethod
-    def claims(request_id: str) -> Dict[str, Any]:
-        qs = CompletedRequestsEntity.claims_for_request(request_id)
-        return {
-            "claims": [
-                {
-                    "id": c.id,
-                    "cv": c.cv.name,
-                    "amount": str(c.amount),
-                    "status": c.status,
-                    "verified_by_pin": c.status == ClaimStatus.VERIFIED_BY_PIN,
-                    "created_at": c.created_at.isoformat(),
-                }
-                for c in qs
-            ]
-        }
+    def claims(request_id: str):
+        return CompletedRequestsEntity.claims_for_request(request_id)
 
     @staticmethod
     def reimburse(claim_id: str) -> Dict[str, Any]:

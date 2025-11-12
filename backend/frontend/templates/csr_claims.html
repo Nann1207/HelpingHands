@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Claims · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .table{width:100%;border-collapse:collapse}
+    .table th{ text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem }
+    .table td{ padding:.6rem .75rem; border-top:1px solid #eee }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/>
+        </svg>
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Requests</a>
+        <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Shortlist</a>
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Match</a>
+        <a href="/csr_claims/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Claims</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <section class="flex flex-col gap-2">
+      <h1 class="text-2xl font-bold">Claims Review</h1>
+      <p class="text-gray-600">See every completed request, verify reimbursements from CVs, and check whether the PIN has confirmed each claim.</p>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="p-4 rounded-xl bg-white border shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="font-semibold">Completed Requests</h2>
+            <p class="text-sm text-gray-500">Select a request to load its claims.</p>
+          </div>
+          <button type="button" data-action="refresh-requests"
+                  class="text-sm px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50">
+            Refresh
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table text-sm">
+            <thead>
+              <tr><th>ID</th><th>PIN</th><th>CV</th><th></th></tr>
+            </thead>
+            <tbody data-table="requests">
+              <tr><td colspan="4" class="text-center text-gray-500 py-6">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white border shadow-sm flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="font-semibold">Claims</h2>
+            <p class="text-sm text-gray-500" data-selected-label>No request selected.</p>
+          </div>
+          <button type="button" data-action="refresh-claims"
+                  class="text-sm px-3 py-1 rounded-md border border-gray-300 text-gray-400 cursor-not-allowed"
+                  disabled>
+            Refresh
+          </button>
+        </div>
+        <div class="flex-1 space-y-3 overflow-y-auto pr-1" data-claims-container>
+          <div class="text-sm text-gray-500">Pick a completed request to see reimbursement claims.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = { requests: [], selectedRequestId: null };
+    const qs = (sel, root=document) => root.querySelector(sel);
+    const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
+    const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
+
+    async function fetchJSON(url, opts={}) {
+      const defaultHeaders = { "X-CSRFToken": getCSRF(), "Content-Type": "application/json" };
+      const resp = await fetch(url, { credentials: "include", headers: { ...defaultHeaders, ...(opts.headers || {}) }, ...opts });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `HTTP ${resp.status}`);
+      }
+      return resp.json();
+    }
+
+    const statusCopy = {
+      submitted: "Submitted",
+      verified_by_pin: "Verified by PIN",
+      disputed_by_pin: "Disputed by PIN",
+      reimbursed_by_csr: "Reimbursed by CSR",
+      rejected_by_csr: "Rejected by CSR",
+    };
+
+    function normalizeList(payload, key){
+      if (Array.isArray(payload)) return payload;
+      if (payload && Array.isArray(payload[key])) return payload[key];
+      return [];
+    }
+
+    function formatMoney(value){
+      if (value == null) return "-";
+      const num = Number(value);
+      return Number.isFinite(num) ? `$${num.toFixed(2)}` : `$${value}`;
+    }
+
+    function formatDate(value){
+      if (!value) return "-";
+      try {
+        return new Date(value).toLocaleString();
+      } catch {
+        return value;
+      }
+    }
+
+    function badgeClass(status){
+      switch (status) {
+        case "verified_by_pin": return "bg-green-50 text-green-700 border-green-200";
+        case "disputed_by_pin": return "bg-amber-50 text-amber-700 border-amber-200";
+        case "reimbursed_by_csr": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        case "rejected_by_csr": return "bg-rose-50 text-rose-700 border-rose-200";
+        default: return "bg-gray-50 text-gray-600 border-gray-200";
+      }
+    }
+
+    function renderRequestRows(){
+      const body = qs("[data-table='requests']");
+      if (!state.requests.length) {
+        body.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">No completed requests yet.</td></tr>';
+        return;
+      }
+      body.innerHTML = state.requests.map(r => {
+        const active = state.selectedRequestId === r.id;
+        return `
+          <tr data-row-id="${r.id}" class="${active ? 'bg-gray-100 ring-1 ring-gray-200' : 'hover:bg-gray-50'}">
+            <td class="font-mono text-xs">${r.id}</td>
+            <td>${r.pin || "-"}</td>
+            <td>${r.cv || "-"}</td>
+            <td class="text-right">
+              <button class="text-xs px-3 py-1 rounded-md border border-gray-300 ${active ? 'bg-gray-900 text-white border-gray-900' : 'hover:bg-gray-100'}"
+                      data-action="view-claims" data-id="${r.id}">
+                ${active ? "Viewing" : "View claims"}
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadCompletedRequests(){
+      const body = qs("[data-table='requests']");
+      body.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">Loading…</td></tr>';
+      try {
+        const data = await fetchJSON("/api/csr/completed/");
+        state.requests = normalizeList(data, "items");
+        if (!state.requests.find(r => r.id === state.selectedRequestId)) {
+          state.selectedRequestId = null;
+          resetClaimsPanel();
+        }
+      } catch (err) {
+        console.error(err);
+        body.innerHTML = `<tr><td colspan="4" class="text-center text-red-600 py-6">${err.message}</td></tr>`;
+        return;
+      }
+      renderRequestRows();
+    }
+
+    function resetClaimsPanel(message = "Pick a completed request to see reimbursement claims."){
+      qs("[data-selected-label]").textContent = "No request selected.";
+      const btn = qs("[data-action='refresh-claims']");
+      btn.disabled = true;
+      btn.classList.add("text-gray-400", "cursor-not-allowed");
+      btn.classList.remove("hover:bg-gray-50");
+      qs("[data-claims-container]").innerHTML = `<div class="text-sm text-gray-500">${message}</div>`;
+    }
+
+    function updateSelectedLabel(requestId){
+      const req = state.requests.find(r => r.id === requestId);
+      const label = req
+        ? `Request ${req.id} · PIN: ${req.pin || "-"} · CV: ${req.cv || "-"}`
+        : "No request selected.";
+      qs("[data-selected-label]").textContent = label;
+      const btn = qs("[data-action='refresh-claims']");
+      if (req) {
+        btn.disabled = false;
+        btn.dataset.reqId = req.id;
+        btn.classList.remove("text-gray-400", "cursor-not-allowed");
+        btn.classList.add("hover:bg-gray-50");
+      } else {
+        btn.disabled = true;
+        delete btn.dataset.reqId;
+        btn.classList.add("text-gray-400", "cursor-not-allowed");
+        btn.classList.remove("hover:bg-gray-50");
+      }
+    }
+
+    function canDecide(status){
+      return status !== "reimbursed_by_csr" && status !== "rejected_by_csr";
+    }
+
+    function claimCard(claim){
+      const status = claim.status || "submitted";
+      const pinVerified = claim.verified_by_pin ?? status === "verified_by_pin";
+      const cvName = (claim.cv && claim.cv.name) || claim.cv || "-";
+      const cvCompany = (claim.cv && claim.cv.company) || null;
+      const amount = claim.amount ?? claim.amount_display;
+      const description = claim.description || "";
+      const category = claim.category || "";
+      const payment = claim.payment_method || claim.payment || "";
+
+      const actions = canDecide(status)
+        ? `
+            <div class="flex flex-wrap gap-2">
+              <button class="px-3 py-1 rounded-md bg-emerald-600 text-white text-xs" data-action="claim-decision" data-claim="${claim.id}" data-choice="reimburse">
+                Reimburse
+              </button>
+              <button class="px-3 py-1 rounded-md bg-rose-600 text-white text-xs" data-action="claim-decision" data-claim="${claim.id}" data-choice="reject">
+                Reject
+              </button>
+            </div>
+          `
+        : `<span class="text-xs text-gray-500">Decision recorded.</span>`;
+
+      return `
+        <article class="border border-gray-200 rounded-lg p-4 space-y-2">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="font-mono text-xs text-gray-500">Claim ${claim.id}</p>
+              <p class="text-sm font-semibold">CV: ${cvName}${cvCompany ? ` · ${cvCompany}` : ""}</p>
+              <p class="text-sm text-gray-600">Amount: <span class="font-medium">${formatMoney(amount)}</span></p>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-xs border ${badgeClass(status)}">
+              ${statusCopy[status] || status.replaceAll("_", " ")}
+            </span>
+          </div>
+          <div class="text-sm text-gray-600 space-y-1">
+            ${category ? `<p><span class="font-medium text-gray-700">Category:</span> ${category}</p>` : ""}
+            ${payment ? `<p><span class="font-medium text-gray-700">Payment:</span> ${payment}</p>` : ""}
+            ${description ? `<p class="text-gray-700">${description}</p>` : ""}
+            <p class="text-xs text-gray-500">Submitted: ${formatDate(claim.created_at)}</p>
+            <p class="text-xs ${pinVerified ? 'text-emerald-600' : 'text-gray-500'}">
+              PIN ${pinVerified ? "verified this claim." : "has not verified yet."}
+            </p>
+          </div>
+          ${actions}
+        </article>
+      `;
+    }
+
+    async function loadClaims(requestId){
+      if (!requestId) {
+        resetClaimsPanel();
+        renderRequestRows();
+        return;
+      }
+      updateSelectedLabel(requestId);
+      const container = qs("[data-claims-container]");
+      container.innerHTML = '<div class="text-sm text-gray-500">Loading claims…</div>';
+      try {
+        const data = await fetchJSON(`/api/csr/completed/${encodeURIComponent(requestId)}/claims/`);
+        const claims = normalizeList(data, "claims");
+        if (!claims.length) {
+          container.innerHTML = '<div class="text-sm text-gray-500">No claims submitted for this request.</div>';
+        } else {
+          container.innerHTML = claims.map(claimCard).join("");
+        }
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="text-sm text-red-600">${err.message}</div>`;
+      }
+    }
+
+    async function submitClaimDecision(claimId, action){
+      try {
+        await fetchJSON(`/api/csr/claims/${encodeURIComponent(claimId)}/decision/`, {
+          method: "POST",
+          body: JSON.stringify({ action })
+        });
+        await loadClaims(state.selectedRequestId);
+      } catch (err) {
+        console.error(err);
+        alert(`Unable to ${action} claim: ${err.message}`);
+      }
+    }
+
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      if (action === "refresh-requests") {
+        await loadCompletedRequests();
+        return;
+      }
+      if (action === "view-claims") {
+        const reqId = button.dataset.id;
+        state.selectedRequestId = reqId;
+        renderRequestRows();
+        await loadClaims(reqId);
+        return;
+      }
+      if (action === "refresh-claims") {
+        if (button.disabled) return;
+        await loadClaims(button.dataset.reqId);
+        return;
+      }
+      if (action === "claim-decision") {
+        const claimId = button.dataset.claim;
+        const choice = button.dataset.choice;
+        await submitClaimDecision(claimId, choice);
+        return;
+      }
+    });
+
+    window.addEventListener("DOMContentLoaded", loadCompletedRequests);
+  </script>
+</body>
+</html>
