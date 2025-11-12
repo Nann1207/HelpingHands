@@ -13,7 +13,7 @@ class CSRRequestListSerializer(serializers.ModelSerializer):
             "pickup_location", "service_location",
             "description", "created_at", "shortlist_count",
         ]
-
+# class for brief CV serializer
 class CVBriefSerializer(serializers.ModelSerializer):
     class Meta:
         model = CV
