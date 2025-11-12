@@ -1,15 +1,11 @@
 # Byte-compiled / optimized / DLL files
+# Ignore all __pycache__ directories anywhere in the repo and Python bytecode files
 __pycache__/
-*.py[codz]
+**/__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
 *$py.class
-boundary/__pycache__/
-/Users/niruba/Desktop/HelpingHands/backend/frontend/__pycache__
-/Users/niruba/Desktop/HelpingHands/backend/core/boundary/__pycache__
-backend/core/__pycache__
-# Ignore Python cache files in boundary and Control folders
-backend/core/boundary/pycache_/
-backend/core/Control/_pycache_/
-backend/frontend/_pycache_/
 
 
 # C extensions
