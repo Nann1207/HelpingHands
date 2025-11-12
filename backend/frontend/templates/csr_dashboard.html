@@ -5,116 +5,163 @@
   <title>CSR · Dashboard · Helping Hands</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
+    #requestsChartWrap { height: 22rem; }
+    #requestsChart { width: 100% !important; height: 100% !important; }
+    code.api { font-size: 0.75rem; padding: 0.15rem 0.35rem; background: #f3f4f6; border-radius: 0.25rem; }
     .table{width:100%;border-collapse:collapse}
     .table th{ text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem }
     .table td{ padding:.6rem .75rem; border-top:1px solid #eee }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
   <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/csr_dashboard/" class="text-xl font-bold">Helping Hands (CSR)</a>
-      <nav class="flex items-center gap-2">
-        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border">Requests</a>
-        <a href="/csr_shortlisted/" class="px-3 py-1.5 rounded-md border">Shortlisted</a>
-        <a href="/csr_matching/" class="px-3 py-1.5 rounded-md border">Matching</a>
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/>
+        </svg>
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Requests</a>
+        <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Shortlist</a>
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Match</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
       </nav>
     </div>
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
-    <h1 class="text-2xl font-bold">Jane’s Dashboard</h1>
-
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Ongoing -->
-      <div class="lg:col-span-2 rounded-2xl border bg-white p-4">
-        <h2 class="font-semibold mb-2">Ongoing Volunteering Services</h2>
-        <div class="overflow-x-auto">
-          <table class="table">
-            <thead><tr><th>Request ID</th><th>PIN Name</th><th>Volunteer</th><th>Date &amp; Time</th></tr></thead>
-            <tbody id="ongoing"><tr><td class="py-3 text-gray-500" colspan="4">Loading…</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Notifications -->
-      <div class="rounded-2xl border bg-white p-4">
-        <h2 class="font-semibold mb-2">Notification</h2>
-        <div id="notif" class="space-y-3 text-sm">
-          <div class="text-gray-500">Loading…</div>
-        </div>
+    <section class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold">CSR Dashboard</h1>
+        <p class="text-gray-600" id="whoami">Checking session…</p>
       </div>
     </section>
 
-    <!-- Matching status -->
-    <section class="rounded-2xl border bg-white p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="font-semibold">Matching Status</h2>
-        <input id="q" placeholder="Search …" class="border rounded-md px-3 py-2 w-64" />
-      </div>
-      <div class="overflow-x-auto">
+    <!-- Today active + committed -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="p-4 rounded-xl bg-white border">
+        <h2 class="font-semibold mb-2">Today’s Active</h2>
         <table class="table">
-          <thead><tr><th>Request ID</th><th>PIN</th><th>Status</th></tr></thead>
-          <tbody id="matchBody"><tr><td class="py-3 text-gray-500" colspan="3">Loading…</td></tr></tbody>
+          <thead><tr><th>ID</th><th>PIN</th><th>CV</th><th>Type</th><th>Time</th></tr></thead>
+          <tbody data-table="todayActive"></tbody>
+        </table>
+      </div>
+      <div class="p-4 rounded-xl bg-white border">
+        <h2 class="font-semibold mb-2">My Committed Requests</h2>
+        <table class="table">
+          <thead><tr><th>ID</th><th>PIN</th><th>Type</th><th>Status</th><th></th></tr></thead>
+          <tbody data-table="committedRows"></tbody>
         </table>
       </div>
     </section>
+
+    <!-- Notifications -->
+    <section class="p-4 rounded-xl bg-white border">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Notifications</h2>
+        <span class="text-xs text-gray-500" id="apiLabel"></span>
+      </div>
+      <ul class="mt-2 space-y-2" data-list="notifications"></ul>
+    </section>
   </main>
 
-  <!-- script for functions -->
   <script>
-    async function jget(u){ const r=await fetch(u,{credentials:"include"}); if(!r.ok) throw new Error(r.status); return r.json(); }
-    const ongoing = document.getElementById("ongoing");
-    const notif = document.getElementById("notif");
-    const matchBody = document.getElementById("matchBody");
-    const q = document.getElementById("q");
+    // ---------- helpers ----------
+    const qs = (sel, root=document) => root.querySelector(sel);
+    const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
+    const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
 
-    let MATCH=[];
-
-    async function loadOngoing(){
-      // Active requests for this CSR’s company (simplify: use CV side endpoint or admin filter if you have)
-      const data = await jget("/api/csr/requests/pending/"); // reuse then filter active via separate call if needed
-      // In your API you may have a CSR “active” endpoint; adjust if present.
-      const active = (await jget("/api/cv/requests/")).filter(r=> r.status==="active"); // fallback if CV endpoint present
-      ongoing.innerHTML = active.length ? active.map(r=>`
-        <tr><td>${r.id}</td><td>${(r.pin_name||r.pin||"")}</td><td>${(r.cv_name||r.cv||"")}</td>
-        <td>${r.appointment_date||""} ${(r.appointment_time||"").slice(0,5)}</td></tr>`).join("")
-        : `<tr><td class="py-3 text-gray-500" colspan="4">No ongoing services.</td></tr>`;
+    async function fetchJSON(url, opts={}) {
+      const resp = await fetch(url, { credentials:"include", headers:{ "X-CSRFToken": getCSRF(), "Content-Type":"application/json" }, ...opts });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
     }
 
-    async function loadNotifications(){
-      try{
-        const items = await jget("/api/me/notifications/");
-        notif.innerHTML = items.length ? items.map(n=>`
-          <div>
-            <div class="font-semibold">${n.title || (n.type==="match_declined"?"Declined new requests":"Update")}</div>
-            <div>Request ${n.request_id||""} ${n.message||""}</div>
-            <div class="text-xs text-gray-500">${(n.created_at||"").replace("T"," ").slice(0,16)}</div>
-          </div>
-        `).join("") : `<div class="text-gray-500">No notifications.</div>`;
-      }catch{
-        notif.innerHTML = `<div class="text-gray-500">Notification API unavailable.</div>`;
+    const formatTime = (value) => {
+      if (!value) return "-";
+      try {
+        const date = value.includes("T") ? new Date(value) : new Date(`1970-01-01T${value}`);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      } catch {
+        return value;
+      }
+    };
+
+    const formatType = (item) => item?.service_type ?? item?.category ?? "-";
+
+    // ---------- page logic ----------
+    async function loadWhoAmI() {
+      try {
+        const me = await fetchJSON("/api/auth/me/");
+        qs("#whoami").textContent = `Logged in as ${me.username} (CSR)`;
+      } catch {
+        location.href = "/login/?next=/csr_dashboard/";
       }
     }
 
-    async function loadMatching(){
-      // Show queue state per request if available
-      // You can back this with a small CSR endpoint; here we derive from pending + queue
-      const pending = await jget("/api/csr/requests/pending/");
-      // If you’ve got a dedicated status endpoint, swap it in:
-      MATCH = pending.map(r=>({ id:r.id, pin:(r.pin_name||""), status:(r.queue_status||"Waiting")})); 
-      drawMatch(MATCH);
+    function renderTodayActive(rows){
+      const body = qs('[data-table="todayActive"]');
+      body.innerHTML = rows.map(r => `
+        <tr class="hover:bg-gray-50">
+          <td class="font-mono">${r.id}</td>
+          <td>${r.pin}</td>
+          <td>${r.cv ?? "-"}</td>
+          <td>${formatType(r)}</td>
+          <td>${formatTime(r.appointment_time)}</td>
+        </tr>
+      `).join("");
     }
-    function drawMatch(arr){
-      const s=(q.value||"").toLowerCase();
-      const L = s ? arr.filter(x=>`${x.id} ${x.pin} ${x.status}`.toLowerCase().includes(s)) : arr;
-      matchBody.innerHTML = L.length ? L.map(x=>`<tr><td>${x.id}</td><td>${x.pin||"-"}</td><td>${x.status}</td></tr>`).join("")
-        : `<tr><td class="py-3 text-gray-500" colspan="3">No rows.</td></tr>`;
-    }
-    q.addEventListener("input",()=>drawMatch(MATCH));
 
-    window.addEventListener("DOMContentLoaded", async ()=>{
-      await Promise.all([loadOngoing(), loadNotifications(), loadMatching()]);
+    function renderCommitted(rows){
+      const body = qs('[data-table="committedRows"]');
+      body.innerHTML = rows.map(r => `
+        <tr class="hover:bg-gray-50">
+          <td class="font-mono">${r.id}</td>
+          <td>${r.pin}</td>
+          <td>${formatType(r)}</td>
+          <td><span class="px-2 py-0.5 rounded-full text-xs border">${r.status}</span></td>
+          <td><a class="text-blue-600 hover:underline" href="/csr_match_detail/${encodeURIComponent(r.id)}/">Open</a></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderNotifications(items){
+      const list = qs('[data-list="notifications"]');
+      list.innerHTML = items.map(n => `
+        <li class="p-3 border rounded-lg flex items-center justify-between">
+          <div>
+            <div class="text-sm font-medium">${n.type.replaceAll("_"," ").toUpperCase()}</div>
+            <div class="text-sm text-gray-700">${n.message}</div>
+            <div class="text-xs text-gray-500">Req: ${n.request_id ?? "-"} · CV: ${n.cv_id ?? "-"}</div>
+          </div>
+          <div class="text-xs text-gray-400">${new Date(n.created_at).toLocaleString()}</div>
+        </li>
+      `).join("");
+      qs("#apiLabel").textContent = "GET /api/csr/notifications/";
+    }
+
+    async function loadCSRDashboard(){
+      const data = await fetchJSON("/api/csr/dashboard/");
+      renderTodayActive(data.today_active || []);
+      renderCommitted(data.committed || []);
+      renderNotifications(data.notifications || []);
+    }
+
+    // init
+    window.addEventListener("DOMContentLoaded", async () => {
+      await loadWhoAmI();
+      await loadCSRDashboard();
     });
   </script>
 </body>

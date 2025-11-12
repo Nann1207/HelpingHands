@@ -5,8 +5,8 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.db.models import JSONField 
+from django.db.models import Q, CheckConstraint
 
 
 
@@ -180,6 +180,7 @@ class RequestStatus(models.TextChoices):
     REVIEW = "review", "Review"           #will go thru moderation/abuse check
     REJECTED = "rejected", "Rejected"     #denied by PA
     PENDING = "pending", "Pending"        #passed review; visible to CSR
+    COMMITTED = "committed", "Committed"   #CSR has committed to find CV
     ACTIVE = "active", "Active"           #matched with cv
     COMPLETE = "complete", "Complete"     #Request finished
 
@@ -259,55 +260,28 @@ class Request(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        ordering = ["-created_at"] #newest requests first
+        constraints = [
+            # If COMMITTED → must have committer + timestamp
+            CheckConstraint(
+                name="req_committed_has_committer",
+                check=~Q(status="committed") | (Q(committed_by_csr__isnull=False) & Q(committed_at__isnull=False)),
+            ),
+            # If PENDING → must NOT have commit fields
+            CheckConstraint(
+                name="req_pending_not_committed",
+                check=~Q(status="pending") | (Q(committed_by_csr__isnull=True) & Q(committed_at__isnull=True)),
+            ),
+        ]
         indexes = [
-            models.Index(fields=["status"]),    #filter by status
-            models.Index(fields=["appointment_date", "appointment_time"]), #filter by appointment datetime
-            models.Index(fields=["pin"]),   #filter by PIN
+            models.Index(fields=["status"]),
             models.Index(fields=["committed_by_csr", "status"]),
+            models.Index(fields=["appointment_date", "appointment_time"]),
+            models.Index(fields=["pin"]),
         ]
 
     def __str__(self):
         return f"{self.id} [{self.status}] {self.service_type} for {self.pin.name}" #display object
     
-
-class ShortlistedRequest(models.Model):
-
-    id = models.BigAutoField(primary_key=True)
-
-    csr = models.ForeignKey(
-        CSRRep,
-        on_delete=models.CASCADE,
-        related_name="shortlists",
-    )
-    request = models.ForeignKey(
-        Request,
-        on_delete=models.CASCADE,
-        related_name="shortlisted_by",
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["csr", "request"],
-                name="uq_shortlist_csr_request"
-            )
-        ]
-        indexes = [
-            models.Index(fields=["csr"]),
-            models.Index(fields=["request"]),
-            models.Index(fields=["-created_at"]),
-        ]
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Shortlist(csr={self.csr_id}, req={self.request_id})"
-
-
-
-
 
 #THIS IS FOR PA
 class FlagType(models.TextChoices):
@@ -462,8 +436,6 @@ class ClaimDispute(models.Model):
 
 #THIS SECTION IS FOR CHAT BETWEEN CV AND PIN
 
-
-
 #a reusable helper filter that helps us get “open” or “closed” chat rooms easily
 class ChatRoomQuerySet(models.QuerySet):
     def open(self):
@@ -577,6 +549,7 @@ class ChatMessage(models.Model):
 
 
 
+#This is for the auto reassignment queue system for CSR to manage PIN assignments
 class MatchQueueStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     ACTIVE  = "active", "Active"     # currently waiting on a CV response
@@ -584,84 +557,106 @@ class MatchQueueStatus(models.TextChoices):
     EXHAUSTED = "exhausted", "Exhausted"  # all 3 declined/expired
 
 class MatchQueue(models.Model):
-    request = models.OneToOneField(Request, on_delete=models.CASCADE, related_name="match_queue")
-    cv1 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+")
-    cv2 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
-    cv3 = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
 
-    current_index = models.PositiveSmallIntegerField(default=1)  # 1,2,3
+    #One queue per Request, OneToOneField, If the Request is deleted, the queue goes too, cascade.
+    request = models.OneToOneField(Request, on_delete=models.CASCADE, related_name="match_queue")
+
+    #The 3 CV are in order, protect is to avoid accidental deletion of CV, related_name="+" is to prevent reverse relation
+    cv1queue = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+")
+    cv2queue = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    cv3queue = models.ForeignKey(CV, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+
+    #current_index tells us which CV (1/2/3) is currently being offered the request.
+    current_index = models.PositiveSmallIntegerField(default=1)  
+
+    #status tells the overall queue state (pending / active / filled / exhausted)
     status = models.CharField(max_length=12, choices=MatchQueueStatus.choices, default=MatchQueueStatus.PENDING)
 
     # timing window for current CV to respond
     sent_at = models.DateTimeField(null=True, blank=True)
-    deadline = models.DateTimeField(null=True, blank=True)  # e.g., sent_at + 1 hour
-
-    def _get_current_cv(self):
-        return {1: self.cv1, 2: self.cv2, 3: self.cv3}.get(self.current_index)
-
-    def start(self, hours_to_respond: int = 1):
-        """Send to cv1 (logical send; controller actually notifies)."""
-        if self.status not in [MatchQueueStatus.PENDING, MatchQueueStatus.ACTIVE]:
-            return
-        self.status = MatchQueueStatus.ACTIVE
-        self.sent_at = timezone.now()
-        self.deadline = self.sent_at + timedelta(hours=hours_to_respond)
-        self.save()
+    deadline = models.DateTimeField(null=True, blank=True)  
 
 
-    def advance(self, hours_to_respond: int = 1) -> bool:
-        """Move to the next CV; returns True if advanced, False if exhausted."""
-        if self.current_index >= 3 or self._get_current_cv() is None:
-            self.status = MatchQueueStatus.EXHAUSTED
-            self.save()
-            return False
-        self.current_index += 1
-        self.sent_at = timezone.now()
-        self.deadline = self.sent_at + timedelta(hours=hours_to_respond)
-        self.save()
-        return True
 
-    def mark_filled(self):
-        self.status = MatchQueueStatus.FILLED
-        self.save()
-
-# --- Notifications (CSR-facing activity feed) ---
-
+# Notifications for CSR
 class NotificationType(models.TextChoices):
     OFFER_SENT      = "offer_sent",      "Offer sent to CV"
     OFFER_DECLINED  = "offer_declined",  "CV declined"
     OFFER_EXPIRED   = "offer_expired",   "CV did not respond (expired)"
     QUEUE_ADVANCED  = "queue_advanced",  "Reassigned to next CV"
     MATCH_ACCEPTED  = "match_accepted",  "CV accepted — match created"
-    MATCH_FILLED    = "match_filled",    "Queue filled (request active)"
-    QUEUE_STARTED   = "queue_started",   "Queue started"
+    NO_MATCH_FOUND  = "no_match_found",  "No match found from queue"
 
 
 
 class Notification(models.Model):
     id = models.BigAutoField(primary_key=True)
 
-    # Who should see this
+    #basically who gets notified
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
 
-    # What happened
+    # Notificiation type
     type = models.CharField(max_length=32, choices=NotificationType.choices)
     message = models.CharField(max_length=300)
 
-    # Useful context to render clickable links in UI
+    #To link the request
     request = models.ForeignKey(Request, on_delete=models.SET_NULL, null=True, blank=True)
+
+    #The related CV
     cv = models.ForeignKey(CV, on_delete=models.SET_NULL, null=True, blank=True)
+
+    #Additional metadata as JSON
     meta = JSONField(default=dict, blank=True)  # e.g. {"rank": 1, "expires_at": "..."} 
 
     created_at = models.DateTimeField(auto_now_add=True)
-    is_read = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["recipient", "is_read"]),
             models.Index(fields=["recipient", "created_at"]),
         ]
 
     def __str__(self):
         return f"[{self.type}] -> {self.recipient_id} {self.message[:40]}"
+    
+
+#Shortlisted Requests by CSR
+class ShortlistedRequest(models.Model):
+
+    id = models.BigAutoField(primary_key=True)
+
+    #The CSR who bookmarked the request
+    csr = models.ForeignKey(
+        CSRRep,
+        on_delete=models.CASCADE,
+        related_name="shortlists",
+    )
+
+    #The request that is being bookmarked
+    request = models.ForeignKey(
+        Request,
+        on_delete=models.CASCADE,
+        related_name="shortlisted_by",
+    )
+
+    #When the bookmark was made
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    #Unique contraint too ensure one shortlist per csr-request pair
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["csr", "request"],
+                name="uq_shortlist_csr_request"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["csr"]),
+            models.Index(fields=["request"]),
+            models.Index(fields=["-created_at"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Shortlist(csr={self.csr_id}, req={self.request_id})"

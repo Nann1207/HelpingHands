@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Match Detail · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .table{width:100%;border-collapse:collapse}
+    .table th{ text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem }
+    .table td{ padding:.6rem .75rem; border-top:1px solid #eee }
+    .badge{padding:.2rem .5rem;border:1px solid #e5e7eb;border-radius:.5rem;font-size:.75rem}
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/></svg>
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Back to Match</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <section class="flex items-end justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Match Details</h1>
+        <p class="text-gray-600">Request <span class="font-mono" id="reqIdLabel">—</span></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="timeout" class="text-sm text-gray-600">Offer timeout (mins)</label>
+        <input id="timeout" type="number" min="1" value="30" class="border rounded-md px-3 py-2 w-24"/>
+        <button id="sendOffersBtn" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Send Offers</button>
+      </div>
+    </section>
+
+    <!-- Suggestions -->
+    <section class="p-4 rounded-xl bg-white border">
+      <h2 class="font-semibold mb-2">Auto-Suggestions (Top 7)</h2>
+      <table class="table">
+        <thead><tr><th></th><th>CV</th><th>Score</th><th>Why</th></tr></thead>
+        <tbody data-table="suggestions"></tbody>
+      </table>
+      <div class="mt-3 flex items-center justify-between">
+        <div class="text-sm text-gray-600">Select up to 3 CVs to form the assignment pool.</div>
+        <button id="setPoolBtn" class="px-3 py-2 rounded-md border hover:bg-gray-100">Set Assignment Pool</button>
+      </div>
+    </section>
+
+    <!-- Current queue -->
+    <section class="p-4 rounded-xl bg-white border">
+      <h2 class="font-semibold mb-2">Current Assignment Pool</h2>
+      <div class="text-sm text-gray-700" id="queueInfo">No pool set.</div>
+    </section>
+  </main>
+
+  <script>
+    // ---------- helpers ----------
+    const qs = (sel, root=document) => root.querySelector(sel);
+    const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
+    const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
+    const REQUEST_ID = "{{ req_id|default:'' }}";
+
+    async function fetchJSON(url, opts={}) {
+      const resp = await fetch(url, { credentials:"include", headers:{ "X-CSRFToken": getCSRF(), "Content-Type":"application/json" }, ...opts });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    }
+
+    // ---------- renderers ----------
+    function renderSuggestions(suggs){
+      const body = qs('[data-table="suggestions"]');
+      body.innerHTML = suggs.map(s => {
+        const why = Object.keys(s.reason || {}).map(k => `<span class="badge mr-1">${k}</span>`).join("");
+        return `
+          <tr class="hover:bg-gray-50">
+            <td><input type="checkbox" data-cv="${s.cv_id}" class="w-4 h-4"/></td>
+            <td class="font-mono">${s.cv_id}</td>
+            <td>${s.score.toFixed(2)}</td>
+            <td>${why || "-"}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderQueue(mq){
+      if(!mq || !mq.request) {
+        qs("#queueInfo").textContent = "No pool set.";
+        return;
+      }
+      const info = [
+        mq.cv1queue ? `#1: ${mq.cv1queue.id ?? mq.cv1queue}` : null,
+        mq.cv2queue ? `#2: ${mq.cv2queue.id ?? mq.cv2queue}` : null,
+        mq.cv3queue ? `#3: ${mq.cv3queue.id ?? mq.cv3queue}` : null
+      ].filter(Boolean).join(" · ");
+
+      const meta = `Status: ${mq.status} · Current: ${mq.current_index} · Deadline: ${mq.deadline ? new Date(mq.deadline).toLocaleString() : "-"}`;
+      qs("#queueInfo").innerHTML = `
+        <div class="space-y-1">
+          <div>${info || "—"}</div>
+          <div class="text-xs text-gray-500">${meta}</div>
+        </div>
+      `;
+    }
+
+    // ---------- API calls ----------
+    async function loadSuggestions(requestId){
+      const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/suggest/`);
+      renderSuggestions(data.suggestions || []);
+    }
+
+    async function setAssignmentPool(requestId, cvIds){
+      const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/assignment/`, {
+        method:"POST",
+        body: JSON.stringify({ cv_ids: cvIds })
+      });
+      renderQueue(data);
+    }
+
+    async function loadAssignmentPool(requestId){
+      const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/assignment/`);
+      renderQueue(data);
+    }
+
+    async function sendOffers(requestId, timeoutMinutes){
+      const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/send_offers/`, {
+        method:"POST",
+        body: JSON.stringify({ timeout_minutes: timeoutMinutes })
+      });
+      // After sending offers, refresh queue display (deadline etc.)
+      renderQueue(data);
+    }
+
+    let autoRefreshHandle = null;
+
+    // ---------- page init ----------
+    async function initCSRMatchDetail(){
+      const reqId = REQUEST_ID?.trim();
+      if(!reqId){ location.href = "/csr_match/"; return; }
+      qs("#reqIdLabel").textContent = reqId;
+
+      await loadSuggestions(reqId);
+
+      qs("#setPoolBtn").addEventListener("click", async () => {
+        const picked = qsa('input[type="checkbox"][data-cv]:checked').slice(0,3).map(el => el.getAttribute("data-cv"));
+        if(picked.length === 0){ alert("Pick at least 1 CV."); return; }
+        try {
+          await setAssignmentPool(reqId, picked);
+        } catch (err) {
+          alert(`Failed to set assignment pool: ${err.message}`);
+        }
+      });
+
+      qs("#sendOffersBtn").addEventListener("click", async () => {
+        const timeout = parseInt(qs("#timeout").value || "30", 10);
+        try {
+          await sendOffers(reqId, timeout);
+        } catch (err) {
+          alert(`Failed to send offers: ${err.message}`);
+        }
+      });
+
+      await loadAssignmentPool(reqId);
+
+      autoRefreshHandle = setInterval(async () => {
+        try {
+          await loadAssignmentPool(reqId);
+        } catch (_) {
+          // ignore transient failures
+        }
+      }, 15000);
+    }
+
+    window.addEventListener("DOMContentLoaded", initCSRMatchDetail);
+  </script>
+</body>
+</html>

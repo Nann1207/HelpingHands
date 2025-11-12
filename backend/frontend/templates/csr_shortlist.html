@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Shortlist · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .table{width:100%;border-collapse:collapse}
+    .table th{ text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem }
+    .table td{ padding:.6rem .75rem; border-top:1px solid #eee }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/></svg>
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Requests</a>
+        <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Shortlist</a>
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Match</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <h1 class="text-2xl font-bold">My Shortlist</h1>
+    <section class="p-4 rounded-xl bg-white border">
+      <table class="table">
+        <thead><tr><th>ID</th><th>PIN</th><th>Category</th><th>Date</th><th>Location</th><th></th></tr></thead>
+        <tbody data-table="shortlistRows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const qs = (sel, root=document) => root.querySelector(sel);
+    const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
+
+    async function fetchJSON(url, opts={}) {
+      const resp = await fetch(url, { credentials:"include", headers:{ "X-CSRFToken": getCSRF(), "Content-Type":"application/json" }, ...opts });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    }
+
+    function rowHTML(item){
+      return `
+        <tr class="hover:bg-gray-50" data-id="${item.request_id}">
+          <td class="font-mono">${item.request_id}</td>
+          <td>${item.pin}</td>
+          <td>${item.category}</td>
+          <td>${item.appointment_date}</td>
+          <td>${item.location}</td>
+          <td class="space-x-2">
+            <button class="px-2 py-1 border rounded-md" data-action="remove">Remove</button>
+            <button class="px-2 py-1 bg-gray-900 text-white rounded-md" data-action="commit">Commit</button>
+          </td>
+        </tr>
+      `;
+    }
+
+    function wireActions(){
+      const body = qs('[data-table="shortlistRows"]');
+      body.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button");
+        if(!btn) return;
+        const tr = btn.closest("tr");
+        const requestId = tr.getAttribute("data-id");
+        const action = btn.getAttribute("data-action");
+
+        if (action === "remove") {
+          await fetchJSON(`/api/csr/requests/${encodeURIComponent(requestId)}/shortlist/`, { method:"DELETE" });
+        } else if (action === "commit") {
+          await fetchJSON(`/api/csr/requests/${encodeURIComponent(requestId)}/commit/`, { method:"POST", body:"{}" });
+        }
+        await loadCSRShortlist();
+      });
+    }
+
+    async function loadCSRShortlist(){
+      const data = await fetchJSON("/api/csr/shortlist/");
+      const body = qs('[data-table="shortlistRows"]');
+      body.innerHTML = (data.items || []).map(rowHTML).join("");
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      wireActions();
+      await loadCSRShortlist();
+    });
+  </script>
+</body>
+</html>

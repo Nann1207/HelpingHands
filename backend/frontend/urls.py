@@ -14,5 +14,12 @@ urlpatterns = [
     path("pin_create_request/", pages.pin_create_request_page, name="pin_create_request_page"),
     path("pin_chats/", pages.pin_chats_page, name="pin_chats_page"),
 
+    # --- Corporate Social Responsibility Rep (CSR) ---
+    path("csr_dashboard/", pages.csr_dashboard_page, name="csr_dashboard_page"),
+    path("csr_requests/", pages.csr_requests_page, name="csr_requests_page"),
+    path("csr_shortlist/", pages.csr_shortlist_page, name="csr_shortlist_page"),
+    path("csr_match/", pages.csr_match_page, name="csr_match_page"),
+    path("csr_match_detail/<str:req_id>/", pages.csr_match_detail_page, name="csr_match_detail_page"),
 ]
+
 

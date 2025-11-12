@@ -40,7 +40,7 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <button id="sendOtp" type="button" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
+      <button id="sendOtp" type="button" onclick =sendOtp() class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
       <input id="otpCode" maxlength="6" placeholder="Enter OTP" class="border rounded-md px-3 py-1.5 w-32" />
       <button id="saveProfile" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Save Changes</button>
     </div>
@@ -119,17 +119,27 @@
       if (me.preferred_cv_language) document.getElementById("prefLang").value = me.preferred_cv_language;
     }catch{}
   }
-
-  document.getElementById("sendOtp").onclick = async (ev) => {
-    ev.preventDefault();
-    const r = await postJSON("/api/pin/profile/otp/start/", {});
-    const msg = document.getElementById("msg");
-    if (r.ok){ msg.textContent = "OTP sent to your email."; msg.className="text-green-700 text-sm"; }
-    else {
-      msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
-      msg.className="text-red-700 text-sm";
-    }
-  };
+  async function sendOtp(){
+    try{
+      const r = await postJSON("/api/pin/profile/otp/start/", {});
+      const msg = document.getElementById("msg");
+      if (r.ok){ msg.textContent = "OTP sent to your email."; msg.className="text-green-700 text-sm"; }
+      else {
+        msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
+        msg.className="text-red-700 text-sm";
+      }
+    }catch{}
+  }
+  // document.getElementById("sendOtp").onclick = async (ev) => {
+  //   ev.preventDefault();
+  //   const r = await postJSON("/api/pin/profile/otp/start/", {});
+  //   const msg = document.getElementById("msg");
+  //   if (r.ok){ msg.textContent = "OTP sent to your email."; msg.className="text-green-700 text-sm"; }
+  //   else {
+  //     msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
+  //     msg.className="text-red-700 text-sm";
+  //   }
+  // };
 
   document.getElementById("saveProfile").onclick = async (ev) => {
     ev.preventDefault();

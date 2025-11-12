@@ -18,8 +18,13 @@ from .pin_views import (
 )
 
 from .csr_views import ( 
-    CSRAdvanceQueueView, CSRCreateQueueView, CSRFlagRequestView,  CSRPendingRequestsView, 
-    CSRShortlistsView, CSRMatchSuggestionsView, CSRStartQueueView, MyNotificationsView, MarkAllNotificationsReadView, MarkNotificationReadView)
+    CSRDashboardView, CSRRequestPoolView, CSRShortlistToggleView,
+    CSRCommitFromPoolView, CSRShortlistView, CSRCommitListView,
+    CSRMatchSuggestView, CSRMatchAssignmentPoolView, CSRSendOffersView,
+    CVCandidateDecisionView, DormantSweepView,
+    CSRNotificationsView, CSRCompletedView, CSRCompletedClaimsView,
+    CSRClaimDecisionView,
+)
 
 # CV
 from .cv_views import (
@@ -84,23 +89,25 @@ urlpatterns = [
 
 
 
-    # CSR core routes
-    path("csr/requests/pending/", CSRPendingRequestsView.as_view(), name="csr-requests-pending"),
-    path("csr/shortlists/", CSRShortlistsView.as_view(), name="csr-shortlists"),
-    path("csr/requests/<str:req_id>/flag/", CSRFlagRequestView.as_view(), name="csr-flag-request"),
+    path("csr/dashboard/", CSRDashboardView.as_view()),
+    path("csr/requests/", CSRRequestPoolView.as_view()),
+    path("csr/requests/<str:request_id>/shortlist/", CSRShortlistToggleView.as_view()),
+    path("csr/requests/<str:request_id>/commit/", CSRCommitFromPoolView.as_view()),
 
-    # suggestions + queue
-    path("csr/requests/<str:req_id>/suggestions/", CSRMatchSuggestionsView.as_view(), name="csr-match-suggestions"),
-    path("csr/requests/<str:req_id>/queue/", CSRCreateQueueView.as_view(), name="csr-create-queue"),
-    path("csr/requests/<str:req_id>/queue/start/", CSRStartQueueView.as_view(), name="csr-start-queue"),
-    path("csr/requests/<str:req_id>/queue/advance/", CSRAdvanceQueueView.as_view(), name="csr-advance-queue"),
+    path("csr/shortlist/", CSRShortlistView.as_view()),
+    path("csr/committed/", CSRCommitListView.as_view()),
 
-    # notifications
-    path("me/notifications/", MyNotificationsView.as_view(), name="me-notifications"),
-    path("me/notifications/mark_all_read/", MarkAllNotificationsReadView.as_view(), name="me-notifications-mark-all"),
-    path("me/notifications/<int:notif_id>/read/", MarkNotificationReadView.as_view(), name="me-notifications-read"),
+    path("csr/match/<str:request_id>/suggest/", CSRMatchSuggestView.as_view()),
+    path("csr/match/<str:request_id>/assignment/", CSRMatchAssignmentPoolView.as_view()),
+    path("csr/match/<str:request_id>/send_offers/", CSRSendOffersView.as_view()),
+    path("csr/match/<str:request_id>/cv/<str:cv_id>/decision/", CVCandidateDecisionView.as_view()),
+    path("csr/match/sweep_dormant/", DormantSweepView.as_view()),
 
+    path("csr/notifications/", CSRNotificationsView.as_view()),
 
+    path("csr/completed/", CSRCompletedView.as_view()),
+    path("csr/completed/<str:request_id>/claims/", CSRCompletedClaimsView.as_view()),
+    path("csr/claims/<str:claim_id>/decision/", CSRClaimDecisionView.as_view()),
 
 
 ]

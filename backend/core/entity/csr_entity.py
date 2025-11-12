@@ -1,295 +1,442 @@
 # core/entity/csr_entity.py
+"""
+ENTITY layer (aka repositories/services) for CSR features.
+Only ORM/database logic lives here (no HTTP, no DRF objects).
+Safe to unit test directly.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import Iterable, List, Optional, Sequence, Dict, Any
-
+from typing import Iterable, List, Optional, Tuple, Dict, Any
 from django.db import transaction
+from django.db.models import Q, Count, F, QuerySet
 from django.utils import timezone
-from django.db.models import Count, Q, IntegerField, Value, Case, When, F
 
 from core.models import (
-    Request, RequestStatus, CSRRep, ShortlistedRequest, FlaggedRequest, FlagType,
-    CV, MatchQueue, Notification, NotificationType, ChatRoom
+    Request, RequestStatus, ShortlistedRequest, CSRRep, CV, Notification,
+    NotificationType, MatchQueue, MatchQueueStatus, ClaimReport, ClaimStatus,
+    ServiceCategory, PersonInNeed,
 )
 
-OFFER_TIMEOUT_HOURS = 1  # each CV has 1 hour to respond by default
 
+# ---------- Dashboard / Listing ----------
 
-@dataclass
-class VolunteerScore:
-    cv_id: str
-    score: int
-
-
-class NotificationEntity:
-    """Small helper to keep Notification writes tidy (no separate file)."""
-
+class DashboardEntity:
     @staticmethod
-    def create(
-        *,
-        recipient,
-        ntype: NotificationType,
-        message: str,
-        request: Optional[Request] = None,
-        cv: Optional[CV] = None,
-        meta: Optional[Dict[str, Any]] = None,
-    ) -> Notification:
-        return Notification.objects.create(
-            recipient=recipient,
-            type=ntype,
-            message=message[:300],
-            request=request,
-            cv=cv,
-            meta=meta or {},
-        )
-
-    @staticmethod
-    def unread_for(user):
-        return Notification.objects.filter(recipient=user, is_read=False).order_by("-created_at")
-
-    @staticmethod
-    def mark_all_read(user):
-        Notification.objects.filter(recipient=user, is_read=False).update(is_read=True)
-
-
-class CSRRepository:
-    # -------- Requests (read) --------
-    @staticmethod
-    def pending_requests_visible_to_csr(csr: CSRRep):
-        # If you need to limit by company/domain later, filter here.
-        return Request.objects.filter(status=RequestStatus.PENDING).order_by("-created_at")
-
-    @staticmethod
-    def shortlisted_requests(csr: CSRRep):
-        return Request.objects.filter(shortlisted_by__csr=csr).order_by("-created_at")
-
-    # -------- Shortlist (write) --------
-    @staticmethod
-    def add_shortlist(csr: CSRRep, req: Request):
-        ShortlistedRequest.objects.get_or_create(csr=csr, request=req)
-
-    @staticmethod
-    def remove_shortlist(csr: CSRRep, req: Request):
-        ShortlistedRequest.objects.filter(csr=csr, request=req).delete()
-
-    # -------- Flags --------
-    @staticmethod
-    def create_manual_flag(csr: CSRRep, req: Request, reason: str = "") -> FlaggedRequest:
-        return FlaggedRequest.objects.create(
-            request=req,
-            flag_type=FlagType.MANUAL,
-            csr=csr,
-            reasonbycsr=reason or "Manual flag by CSR.",
-        )
-
-    # -------- Suggestions (rank 7) --------
-    @staticmethod
-    def candidate_cvs_for_request(req: Request, csr: CSRRep, limit: int = 7) -> List[CV]:
+    def today_active_requests(csr: CSRRep) -> QuerySet:
         """
-        CVs under this CSR's company ranked by:
-          1) service category match (desc)
-          2) completed assignments count (desc)
-          3) active load (asc)
-          4) id asc (tie-break)
+        Active requests whose appointment date is today, belonging to CSR's company (if applicable).
         """
-        qs = CV.objects.filter(company=csr.company)
-
-        svc_match = Case(
-            When(service_category_preference=req.service_type, then=Value(1)),
-            default=Value(0),
-            output_field=IntegerField(),
-        )
-
-        qs = (
-            qs.annotate(
-                svc_match=svc_match,
-                active_load=Count(
-                    "assigned_requests",
-                    filter=Q(assigned_requests__status__in=[RequestStatus.ACTIVE]),
-                ),
-                completed_count=Count(
-                    "assigned_requests",
-                    filter=Q(assigned_requests__status=RequestStatus.COMPLETE),
-                ),
-            )
-            .order_by(
-                F("svc_match").desc(),
-                F("completed_count").desc(),
-                F("active_load").asc(),
-                "id",
-            )
-        )
-        return list(qs[:limit])
+        today = timezone.localdate()
+        qs = Request.objects.filter(
+            status=RequestStatus.ACTIVE,
+            appointment_date=today,
+        ).select_related("pin", "cv")
+        # If CSR should only see his company’s CV-assigned requests, filter by CV.company
+        # return qs.filter(cv__company=csr.company) if needed
+        return qs
 
     @staticmethod
-    def score_candidates(req: Request, csr: CSRRep, limit: int = 7) -> List[Dict[str, Any]]:
-        cvs = CSRRepository.candidate_cvs_for_request(req, csr, limit=limit)
-        return [
-            {
-                "id": cv.id,
-                "name": cv.name,
-                "gender": cv.gender,
-                "main_language": cv.main_language,
-                "second_language": cv.second_language,
-                "service_category_preference": cv.service_category_preference,
-                "svc_match": getattr(cv, "svc_match", 0),
-                "completed_count": getattr(cv, "completed_count", 0),
-                "active_load": getattr(cv, "active_load", 0),
-            }
-            for cv in cvs
-        ]
+    def committed_requests(csr: CSRRep) -> QuerySet:
+        """
+        All requests this CSR has committed to (any status).
+        """
+        return Request.objects.filter(
+            committed_by_csr=csr
+        ).select_related("pin", "cv")
 
-    # -------- Matching Queue (1..3) --------
+    @staticmethod
+    def recent_notifications(user, limit: int = 30) -> QuerySet:
+        return Notification.objects.filter(
+            recipient=user
+        ).select_related("cv", "request")[:limit]
+
+
+class RequestEntity:
+    @staticmethod
+    def available_requests() -> QuerySet:
+        """
+        Pool shown on Request Page (PENDING only).
+        Includes shortlist count via annotation.
+        """
+        return (
+            Request.objects.filter(status=RequestStatus.PENDING)
+            .select_related("pin")
+            .annotate(shortlist_count=Count("shortlisted_by"))
+            .order_by("appointment_date", "appointment_time")
+        )
+
+    @staticmethod
+    def coming_soon(days: int = 7) -> QuerySet:
+        """
+        PENDING requests with near appointment dates (next `days`).
+        """
+        today = timezone.localdate()
+        return (
+            Request.objects.filter(
+                status=RequestStatus.PENDING,
+                appointment_date__range=(today, today + timezone.timedelta(days=days)),
+            )
+            .select_related("pin")
+            .annotate(shortlist_count=Count("shortlisted_by"))
+            .order_by("appointment_date", "appointment_time")
+        )
+
     @staticmethod
     @transaction.atomic
-    def create_queue_for_request(csr: CSRRep, req: Request, selected_cv_ids: Sequence[str]) -> MatchQueue:
+    def shortlist(csr: CSRRep, request_id: str) -> ShortlistedRequest:
+        req = Request.objects.select_for_update().get(pk=request_id)
+        sl, _ = ShortlistedRequest.objects.get_or_create(csr=csr, request=req)
+        return sl
+
+    @staticmethod
+    @transaction.atomic
+    def remove_shortlist(csr: CSRRep, request_id: str) -> None:
+        ShortlistedRequest.objects.filter(
+            csr=csr, request_id=request_id
+        ).delete()
+
+    @staticmethod
+    @transaction.atomic
+    def commit(csr: CSRRep, request_id: str) -> Request:
         """
-        selected_cv_ids: length 1..3 (ordered).
-        Enforces PENDING request and confines to CSR's company.
+        Commit = move from PENDING → COMMITTED and stamp committer/ts.
+        Relies on model CheckConstraints to enforce integrity.
         """
+        req = Request.objects.select_for_update().get(pk=request_id)
         if req.status != RequestStatus.PENDING:
-            raise ValueError("Request must be PENDING to start matching.")
+            raise ValueError("Only PENDING requests can be committed.")
+        req.status = RequestStatus.COMMITTED
+        req.committed_by_csr = csr
+        req.committed_at = timezone.now()
+        req.save(update_fields=["status", "committed_by_csr", "committed_at", "updated_at"])
+        return req
 
-        cvs = list(CV.objects.filter(id__in=selected_cv_ids, company=csr.company))
-        cv_map = {cv.id: cv for cv in cvs}
-        ordered = [cv_map.get(i) for i in selected_cv_ids if cv_map.get(i)]
 
-        if not ordered:
-            raise ValueError("No valid CVs selected.")
-        if len(ordered) > 3:
-            raise ValueError("Select at most 3 CVs.")
+class ShortlistEntity:
+    @staticmethod
+    def list_shortlist(csr: CSRRep) -> QuerySet:
+        return (
+            ShortlistedRequest.objects.filter(
+                csr=csr,
+                request__status=RequestStatus.PENDING,
+            )
+            .select_related("request", "request__pin")
+            .order_by("-created_at")
+        )
 
-        mq, _ = MatchQueue.objects.update_or_create(
+
+class CommitEntity:
+    @staticmethod
+    def list_committed(csr: CSRRep) -> QuerySet:
+        return Request.objects.filter(
+            status=RequestStatus.COMMITTED, committed_by_csr=csr
+        ).select_related("pin")
+
+
+# ---------- Matching (Auto-suggest & Assignment Pool) ----------
+
+@dataclass
+class Suggestion:
+    cv_id: str
+    score: float
+    reason: Dict[str, Any]
+
+
+class MatchEntity:
+    @staticmethod
+    def _score_cv_for_request(req: Request, cv: CV) -> Tuple[float, Dict[str, Any]]:
+        """
+        Compute a simple match score using category + preferences (gender/language).
+        Expand as needed (distance, historical performance, etc.).
+        """
+        score = 0.0
+        reasons = {}
+
+        # Category preference
+        if cv.service_category_preference == req.service_type:
+            score += 3.0
+            reasons["category"] = True
+
+        # PIN preferences
+        pin: PersonInNeed = req.pin
+        if pin.preferred_cv_gender and cv.gender == pin.preferred_cv_gender:
+            score += 2.0
+            reasons["gender"] = True
+        if cv.main_language == pin.preferred_cv_language:
+            score += 2.0
+            reasons["language_main"] = True
+        elif cv.second_language and cv.second_language == pin.preferred_cv_language:
+            score += 1.0
+            reasons["language_second"] = True
+
+        # Sooner appointments = prioritise available CVs (placeholder +1)
+        score += 1.0
+
+        return score, reasons
+
+    @staticmethod
+    def suggest_top(req: Request, limit: int = 7) -> List[Suggestion]:
+        cvs = CV.objects.select_related("company").all()
+        scored: List[Suggestion] = []
+        for cv in cvs:
+            s, why = MatchEntity._score_cv_for_request(req, cv)
+            if s > 0:
+                scored.append(Suggestion(cv_id=cv.id, score=s, reason=why))
+        scored.sort(key=lambda x: x.score, reverse=True)
+        return scored[:limit]
+
+    @staticmethod
+    @transaction.atomic
+    def set_assignment_pool(request_id: str, cv_ids: List[str]) -> MatchQueue:
+        """
+        Select up to 3 CVs in order; create or update the MatchQueue.
+        """
+        if not (1 <= len(cv_ids) <= 3):
+            raise ValueError("You must pick 1 to 3 CVs.")
+        req = Request.objects.select_for_update().get(pk=request_id)
+        cv_list = list(CV.objects.filter(id__in=cv_ids))
+        # Preserve the order the CSR chose
+        cv_map = {cv.id: cv for cv in cv_list}
+        ordered = [cv_map[cid] for cid in cv_ids if cid in cv_map]
+        if len(ordered) != len(cv_ids):
+            raise ValueError("Some CVs not found.")
+
+        qs = MatchQueue.objects.select_for_update()
+        mq, created = qs.get_or_create(
             request=req,
             defaults={
-                "cv1": ordered[0],
-                "cv2": ordered[1] if len(ordered) >= 2 else None,
-                "cv3": ordered[2] if len(ordered) >= 3 else None,
+                "cv1queue": ordered[0],
+                "cv2queue": ordered[1] if len(ordered) > 1 else None,
+                "cv3queue": ordered[2] if len(ordered) > 2 else None,
                 "current_index": 1,
+                "status": MatchQueueStatus.PENDING,
+                "sent_at": None,
+                "deadline": None,
             },
         )
-
-        # mark CSR commit
-        now = timezone.now()
-        req.committed_by_csr = csr
-        req.committed_at = now
-        req.save(update_fields=["committed_by_csr", "committed_at"])
-
-        # 🔔 notify CSR: queue prepared
-        NotificationEntity.create(
-            recipient=csr.user,
-            ntype=NotificationType.QUEUE_STARTED,
-            message=f"Queue prepared for {req.id} with {len(ordered)} CV(s).",
-            request=req,
-            meta={"cv_ids": [c.id for c in ordered]},
-        )
+        if not created:
+            mq.cv1queue = ordered[0]
+            mq.cv2queue = ordered[1] if len(ordered) > 1 else None
+            mq.cv3queue = ordered[2] if len(ordered) > 2 else None
+            mq.current_index = 1
+            mq.status = MatchQueueStatus.PENDING
+            mq.sent_at = None
+            mq.deadline = None
+            mq.save(update_fields=["cv1queue", "cv2queue", "cv3queue", "current_index", "status", "sent_at", "deadline"])
+        else:
+            mq.save()
         return mq
 
     @staticmethod
-    @transaction.atomic
-    def start_queue(mq: MatchQueue, hours_to_respond: int = OFFER_TIMEOUT_HOURS):
-        mq.start(hours_to_respond=hours_to_respond)
-        current_cv = mq._get_current_cv()
-
-        # 🔔 notify CSR: offer sent to current CV
-        csr_user = mq.request.committed_by_csr.user if mq.request.committed_by_csr else None
-        if csr_user and current_cv:
-            NotificationEntity.create(
-                recipient=csr_user,
-                ntype=NotificationType.OFFER_SENT,
-                message=f"Offer sent to {current_cv.name} for {mq.request.id}.",
-                request=mq.request,
-                cv=current_cv,
-                meta={"rank": mq.current_index, "deadline": mq.deadline.isoformat() if mq.deadline else None},
-            )
-        return current_cv
+    def get_assignment_pool(request_id: str) -> Optional[MatchQueue]:
+        try:
+            return MatchQueue.objects.select_related(
+                "cv1queue__company", "cv2queue__company", "cv3queue__company"
+            ).get(request_id=request_id)
+        except MatchQueue.DoesNotExist:
+            return None
 
     @staticmethod
     @transaction.atomic
-    def cv_accept(req: Request, cv: CV):
-        """CV accepts → lock match, assign cv, open chat, set ACTIVE, notify."""
-        mq = req.match_queue
-        current = mq._get_current_cv()
-        if current != cv:
-            raise ValueError("This CV is not the current candidate.")
+    def send_offers(request_id: str, timeout_minutes: int = 30) -> MatchQueue:
+        """
+        Start the offer sequence — send to CV#1 (ACTIVE). Notifications recorded here.
+        """
+        req = Request.objects.select_for_update().get(pk=request_id)
+        mq = MatchQueue.objects.select_for_update().get(request=req)
 
-        req.cv = cv
-        req.status = RequestStatus.ACTIVE
-        req.save(update_fields=["cv", "status"])
+        # Move to ACTIVE and notify CV#1
+        mq.status = MatchQueueStatus.ACTIVE
+        mq.sent_at = timezone.now()
+        mq.deadline = mq.sent_at + timezone.timedelta(minutes=timeout_minutes)
+        mq.save(update_fields=["status", "sent_at", "deadline"])
 
-        ChatRoom.objects.get_or_create(request=req)
+        # Notify CSR user (recipient = CSRRep.user) and optionally the CV (if your app supports it)
+        Notification.objects.create(
+            recipient=req.committed_by_csr.user,  # CSR account user
+            type=NotificationType.OFFER_SENT,
+            message=f"Offer sent to CV #{mq.current_index} for {req.id}",
+            request=req,
+            cv=[mq.cv1queue, mq.cv2queue, mq.cv3queue][mq.current_index - 1] if mq.current_index <= 3 else None,
+            meta={"rank": mq.current_index, "expires_at": mq.deadline.isoformat()},
+        )
+        return mq
 
-        mq.mark_filled()
 
-        # 🔔 notify CSR: accepted + filled
-        if req.committed_by_csr:
-            NotificationEntity.create(
+class MatchProgressEntity:
+    @staticmethod
+    def _get_current_cv(mq: MatchQueue) -> Optional[CV]:
+        if mq.current_index == 1:
+            return mq.cv1queue
+        if mq.current_index == 2:
+            return mq.cv2queue
+        if mq.current_index == 3:
+            return mq.cv3queue
+        return None
+
+    @staticmethod
+    @transaction.atomic
+    def record_cv_decision(request_id: str, cv_id: str, accepted: bool) -> Request:
+        """
+        CV accepts or declines. On accept → match; on decline → advance.
+        """
+        req = Request.objects.select_for_update().get(pk=request_id)
+        mq = MatchQueue.objects.select_for_update().get(request=req)
+
+        current_cv = MatchProgressEntity._get_current_cv(mq)
+        if not current_cv or current_cv.id != cv_id or mq.status != MatchQueueStatus.ACTIVE:
+            raise ValueError("Invalid CV decision state.")
+
+        if accepted:
+            # Create the match
+            req.cv = current_cv
+            req.status = RequestStatus.ACTIVE
+            req.save(update_fields=["cv", "status", "updated_at"])
+
+            mq.status = MatchQueueStatus.FILLED
+            mq.save(update_fields=["status"])
+
+            Notification.objects.create(
                 recipient=req.committed_by_csr.user,
-                ntype=NotificationType.MATCH_ACCEPTED,
-                message=f"{cv.name} accepted. Request {req.id} is now ACTIVE.",
+                type=NotificationType.MATCH_ACCEPTED,
+                message=f"{current_cv.name} accepted {req.id}.",
                 request=req,
-                cv=cv,
+                cv=current_cv,
             )
-            NotificationEntity.create(
+            return req
+
+        # Declined — advance
+        Notification.objects.create(
+            recipient=req.committed_by_csr.user,
+            type=NotificationType.OFFER_DECLINED,
+            message=f"{current_cv.name} declined {req.id}. Advancing.",
+            request=req,
+            cv=current_cv,
+        )
+        return MatchProgressEntity._advance_queue(req, mq)
+
+    @staticmethod
+    def _advance_queue(req: Request, mq: MatchQueue) -> Request:
+        # Advance to next index or exhaust
+        nxt = mq.current_index + 1
+        next_cv = None
+        if nxt == 2:
+            next_cv = mq.cv2queue
+        elif nxt == 3:
+            next_cv = mq.cv3queue
+
+        if next_cv:
+            mq.current_index = nxt
+            mq.sent_at = timezone.now()
+            mq.deadline = mq.sent_at + timezone.timedelta(minutes=30)
+            mq.status = MatchQueueStatus.ACTIVE
+            mq.save(update_fields=["current_index", "sent_at", "deadline", "status"])
+
+            Notification.objects.create(
                 recipient=req.committed_by_csr.user,
-                ntype=NotificationType.MATCH_FILLED,
-                message=f"Queue filled for {req.id}.",
+                type=NotificationType.QUEUE_ADVANCED,
+                message=f"Offer moved to CV #{mq.current_index} for {req.id}.",
                 request=req,
-                cv=cv,
+                cv=next_cv,
+                meta={"rank": mq.current_index, "expires_at": mq.deadline.isoformat()},
             )
+        else:
+            mq.status = MatchQueueStatus.EXHAUSTED
+            mq.save(update_fields=["status"])
+            Notification.objects.create(
+                recipient=req.committed_by_csr.user,
+                type=NotificationType.NO_MATCH_FOUND,
+                message=f"No match found from queue for {req.id}.",
+                request=req,
+            )
+            # Optionally: revert request to COMMITTED (still in CSR pool)
+            req.status = RequestStatus.COMMITTED
+            req.cv = None
+            req.save(update_fields=["status", "cv", "updated_at"])
+
         return req
 
     @staticmethod
     @transaction.atomic
-    def cv_decline_or_timeout(req: Request, hours_to_respond: int = OFFER_TIMEOUT_HOURS):
+    def auto_advance_dormant(now=None) -> int:
         """
-        Current CV declined/timed out → advance to next CV if available.
-        Notifies CSR about expiry and reassignment (or exhaustion).
-        Returns next CV or None if exhausted.
+        Called by a periodic job. Moves expired ACTIVE queues to next CV.
+        Returns number of advanced queues.
         """
-        mq = req.match_queue
-        prev_cv = mq._get_current_cv()
-        advanced = mq.advance(hours_to_respond=hours_to_respond)
-        csr_user = req.committed_by_csr.user if req.committed_by_csr else None
-
-        # 🔔 notify CSR: previous expired/declined
-        if csr_user and prev_cv:
-            NotificationEntity.create(
-                recipient=csr_user,
-                ntype=NotificationType.OFFER_EXPIRED,
-                message=f"{prev_cv.name} did not accept in time for {req.id}.",
+        now = now or timezone.now()
+        qs = MatchQueue.objects.select_for_update().filter(
+            status=MatchQueueStatus.ACTIVE,
+            deadline__isnull=False,
+            deadline__lt=now,
+        )
+        count = 0
+        for mq in qs:
+            req = mq.request
+            MatchProgressEntity._advance_queue(req, mq)
+            Notification.objects.create(
+                recipient=req.committed_by_csr.user,
+                type=NotificationType.OFFER_EXPIRED,
+                message=f"No response — auto-advanced for {req.id}.",
                 request=req,
-                cv=prev_cv,
+                cv=MatchProgressEntity._get_current_cv(mq),
             )
+            count += 1
+        return count
 
-        if advanced:
-            next_cv = mq._get_current_cv()
-            if csr_user and next_cv:
-                NotificationEntity.create(
-                    recipient=csr_user,
-                    ntype=NotificationType.QUEUE_ADVANCED,
-                    message=f"Reassigned {req.id} to {next_cv.name}.",
-                    request=req,
-                    cv=next_cv,
-                    meta={"rank": mq.current_index, "deadline": mq.deadline.isoformat() if mq.deadline else None},
-                )
-                NotificationEntity.create(
-                    recipient=csr_user,
-                    ntype=NotificationType.OFFER_SENT,
-                    message=f"Offer sent to {next_cv.name} for {req.id}.",
-                    request=req,
-                    cv=next_cv,
-                    meta={"rank": mq.current_index, "deadline": mq.deadline.isoformat() if mq.deadline else None},
-                )
-            return next_cv
+    @staticmethod
+    @transaction.atomic
+    def ensure_current_queue(request_id: str) -> Optional[MatchQueue]:
+        try:
+            req = Request.objects.select_for_update().get(pk=request_id)
+        except Request.DoesNotExist:
+            return None
+        try:
+            mq = MatchQueue.objects.select_for_update().get(request=req)
+        except MatchQueue.DoesNotExist:
+            return None
+        if (
+            mq.status == MatchQueueStatus.ACTIVE
+            and mq.deadline
+            and mq.deadline < timezone.now()
+        ):
+            MatchProgressEntity._advance_queue(req, mq)
+            mq.refresh_from_db()
+        return mq
 
-        # exhausted
-        if csr_user:
-            NotificationEntity.create(
-                recipient=csr_user,
-                ntype=NotificationType.QUEUE_ADVANCED,
-                message=f"No more candidates left for {req.id} (queue exhausted).",
-                request=req,
-            )
-        return None
+
+# ---------- Notifications ----------
+
+class NotificationEntity:
+    @staticmethod
+    def list_for_user(user) -> QuerySet:
+        return Notification.objects.filter(recipient=user).select_related("request", "cv").order_by("-created_at")
+
+
+# ---------- Completed & Claims ----------
+
+class CompletedRequestsEntity:
+    @staticmethod
+    def list_completed(csr: CSRRep) -> QuerySet:
+        """
+        Completed requests (optionally scoped by company).
+        """
+        return Request.objects.filter(
+            status=RequestStatus.COMPLETE
+        ).select_related("pin", "cv").order_by("-completed_at")
+
+    @staticmethod
+    def claims_for_request(request_id: str) -> QuerySet:
+        return (
+            ClaimReport.objects.filter(request_id=request_id)
+            .select_related("cv", "request")
+            .order_by("-created_at")
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def set_claim_status(claim_id: str, status: ClaimStatus) -> ClaimReport:
+        cl = ClaimReport.objects.select_for_update().get(pk=claim_id)
+        cl.status = status
+        cl.save(update_fields=["status", "updated_at"])
+        return cl

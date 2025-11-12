@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from core.models import FlaggedRequest, Request
 
-#This is for flagged req serializer 
 class FlaggedRequestSerializer(serializers.ModelSerializer):
     
     

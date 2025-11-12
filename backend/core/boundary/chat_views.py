@@ -14,8 +14,6 @@ from .chat_serializers import (
 )
 
 
-
-
 #GET /api/me/chats/?status=all|open|closed
 #list chats for the current logged-in user.
 class MyChatsView(APIView):
@@ -24,7 +22,6 @@ class MyChatsView(APIView):
         status_param = None if status_param in (None, "all") else status_param
         chats = ChatController.list_my_chats(user=request.user, status=status_param) #Fetch chats based on cv or pin
         return Response(ChatRoomSerializer(chats, many=True).data) #serilaisers to convert chat objects to JSON
-
 
 
 

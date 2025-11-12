@@ -1,176 +1,270 @@
-# core/boundary/csr_views.py
+# core/Boundary/csr_views.py
+
+
 from __future__ import annotations
+from typing import List
 
-from django.shortcuts import get_object_or_404
-from rest_framework import status, serializers
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, serializers
 
-from core.Control.csr_controller import CSRController
-from core.models import Request, CV, Notification
+from core.models import CSRRep, RequestStatus
 
-# ---- Inline serializers (keeps the file self-contained) ----
+from core.Control.csr_controller import (
+    CSRDashboardController, CSRRequestController, CSRShortlistController,
+    CSRCommitController, CSRMatchController, CSRNotificationController,
+    CSRCompletedController,
+)
+from core.boundary.csr_serializers import (
+    RequestListSerializer,
+    NotificationSerializer,
+    ClaimReportSerializer,
+    CVSuggestionSerializer,
+    ShortlistCreateSerializer,
+    CommitSerializer,
+)
 
-class CSRRequestListSerializer(serializers.ModelSerializer):
-    shortlist_count = serializers.IntegerField(source="shortlisted_by.count", read_only=True)
 
-    class Meta:
-        model = Request
-        fields = [
-            "id", "service_type", "status",
-            "appointment_date", "appointment_time",
-            "pickup_location", "service_location",
-            "description", "created_at", "shortlist_count",
-        ]
+# ---- Permissions -------------------------------------------------------------
 
-# class for CV suggestion serializer
-class CVSuggestionSerializer(serializers.Serializer):
+class IsCSRRep:
+    def has_permission(self, request, view):
+        return hasattr(request.user, "csrrep")
+
+
+def _csr(request) -> CSRRep:
+    return request.user.csrrep
+
+
+# ---- Response serializers (UI-shaped) ---------------------------------------
+
+class ComingSoonResponseSerializer(serializers.Serializer):
+    coming_soon = RequestListSerializer(many=True)
+    all_requests = RequestListSerializer(many=True)
+
+
+class DashboardResponseSerializer(serializers.Serializer):
+    today_active = RequestListSerializer(many=True)
+    committed = RequestListSerializer(many=True)
+    notifications = NotificationSerializer(many=True)
+
+
+class _SafeShortlistRow(dict):
+    """Gracefully return None for missing keys when serializing shortlist rows."""
+
+    def __missing__(self, key):
+        return None
+
+
+class ShortlistItemSerializer(serializers.Serializer):
+    shortlist_id = serializers.IntegerField()
+    request_id = serializers.CharField()
+    pin = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    category = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    service_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    appointment_date = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    location = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    service_location = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def to_representation(self, instance):
+        if isinstance(instance, dict) and not isinstance(instance, _SafeShortlistRow):
+            instance = _SafeShortlistRow(instance)
+        data = super().to_representation(instance)
+        if not data.get("category"):
+            data["category"] = data.get("service_type") or ""
+        if not data.get("location"):
+            data["location"] = data.get("service_location") or ""
+        return data
+
+
+class CommitResponseSerializer(serializers.Serializer):
     id = serializers.CharField()
-    name = serializers.CharField()
-    gender = serializers.CharField()
-    main_language = serializers.CharField()
-    second_language = serializers.CharField(allow_null=True, allow_blank=True)
-    service_category_preference = serializers.CharField()
-    svc_match = serializers.IntegerField()
-    completed_count = serializers.IntegerField()
-    active_load = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=RequestStatus.choices)
 
 
-class NotificationSerializer(serializers.ModelSerializer):
-    request_id = serializers.CharField(source="request.id", allow_null=True, read_only=True)
-    cv_id = serializers.CharField(source="cv.id", allow_null=True, read_only=True)
-    cv_name = serializers.CharField(source="cv.name", allow_null=True, read_only=True)
-
-    class Meta:
-        model = Notification
-        fields = ["id", "type", "message", "request_id", "cv_id", "cv_name", "meta", "created_at", "is_read"]
+class CVDecisionSerializer(serializers.Serializer):
+    accepted = serializers.BooleanField()
 
 
-# ---- Views ----
+class ClaimDecisionSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["reimburse", "reject"])
 
-class CSRPendingRequestsView(APIView):
-    permission_classes = [IsAuthenticated]
+
+# ---- 1) Dashboard ------------------------------------------------------------
+
+class CSRDashboardView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
 
     def get(self, request):
-        qs = CSRController.list_pending(request.user)
-        return Response(CSRRequestListSerializer(qs, many=True).data)
+        data = CSRDashboardController.get_dashboard(_csr(request))
+        return Response(DashboardResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
-class CSRShortlistsView(APIView):
-    permission_classes = [IsAuthenticated]
+# ---- 2) Requests Pool --------------------------------------------------------
+
+class CSRRequestPoolView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
 
     def get(self, request):
-        qs = CSRController.list_shortlisted(request.user)
-        return Response(CSRRequestListSerializer(qs, many=True).data)
-
-    def post(self, request):
-        req_id = request.data.get("request_id")
-        if not req_id:
-            return Response({"detail": "request_id is required."}, status=400)
-        CSRController.shortlist(request.user, req_id)
-        return Response({"ok": True})
-
-    def delete(self, request):
-        req_id = request.data.get("request_id")
-        if not req_id:
-            return Response({"detail": "request_id is required."}, status=400)
-        CSRController.unshortlist(request.user, req_id)
-        return Response(status=204)
+        data = CSRRequestController.list_pool()
+        return Response(ComingSoonResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
-class CSRFlagRequestView(APIView):
-    permission_classes = [IsAuthenticated]
+class CSRShortlistToggleView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
 
-    def post(self, request, req_id: str):
-        reason = request.data.get("reason", "")
-        flag = CSRController.flag_request(request.user, req_id, reason)
-        return Response({"flag_id": getattr(flag, "id", None), "status": "created"}, status=201)
-
-
-# ---- Suggestions + Queue endpoints ----
-
-class CSRMatchSuggestionsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, req_id: str):
-        data = CSRController.get_suggestions(request.user, req_id)
-        return Response(CVSuggestionSerializer(data, many=True).data, status=200)
-
-
-class CSRCreateQueueView(APIView):
-    """
-    POST body: { "cv_ids": ["CVxxxx","CVyyyy","CVzzzz"] } (ordered, length 1..3)
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, req_id: str):
-        ids = request.data.get("cv_ids") or []
-        mq = CSRController.create_queue(request.user, req_id, ids)
-        payload = {
-            "request_id": mq.request_id,
-            "cv1": getattr(mq.cv1, "id", None),
-            "cv2": getattr(mq.cv2, "id", None),
-            "cv3": getattr(mq.cv3, "id", None),
-            "current_index": mq.current_index,
-            "status": mq.status,
+    def post(self, request, request_id: str):
+        csr = _csr(request)
+        ser = ShortlistCreateSerializer(data={"request": request_id}, context={"csr": csr})
+        ser.is_valid(raise_exception=True)
+        data = CSRRequestController.shortlist_add(csr, request_id)
+        # shape to ShortlistItemSerializer-like row for your HTML table
+        row = {
+            "shortlist_id": data["id"],
+            "request_id": data["request_id"],
+            "pin": data.get("pin", ""),
+            "service_type": data.get("service_type", ""),
+            "appointment_date": data.get("appointment_date", ""),
+            "service_location": data.get("service_location", ""),
         }
-        return Response(payload, status=201)
+        return Response(ShortlistItemSerializer(row).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, request_id: str):
+        data = CSRRequestController.shortlist_remove(_csr(request), request_id)
+        return Response(data, status=status.HTTP_200_OK)
 
 
-class CSRStartQueueView(APIView):
-    """
-    POST body (optional): { "hours_to_respond": 1 }
-    """
-    permission_classes = [IsAuthenticated]
+class CSRCommitFromPoolView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
 
-    def post(self, request, req_id: str):
-        hours = int(request.data.get("hours_to_respond", 1))
-        current_cv = CSRController.start_queue(request.user, req_id, hours_to_respond=hours)
-        return Response({"current_cv": getattr(current_cv, "id", None)}, status=200)
+    def post(self, request, request_id: str):
+        ser = CommitSerializer(data={"request_id": request_id})
+        ser.is_valid(raise_exception=True)
+        data = CSRRequestController.commit_request(_csr(request), request_id)
+        return Response(CommitResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
-class CSRAdvanceQueueView(APIView):
-    """
-    Manually advance after a decline/timeout sweep; returns the new current CV (if any).
-    POST body (optional): { "hours_to_respond": 1 }
-    """
-    permission_classes = [IsAuthenticated]
+# ---- 3) Shortlist Page -------------------------------------------------------
 
-    def post(self, request, req_id: str):
-        hours = int(request.data.get("hours_to_respond", 1))
-        next_cv = CSRController.advance_queue(request.user, req_id, hours_to_respond=hours)
-        return Response({"current_cv": getattr(next_cv, "id", None)}, status=200)
-
-
-# ---- Notifications ----
-
-class MyNotificationsView(APIView):
-    permission_classes = [IsAuthenticated]
+class CSRShortlistView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
 
     def get(self, request):
-        unread_only = request.query_params.get("unread") in ("1", "true", "yes")
-        qs = Notification.objects.filter(recipient=request.user)
-        if unread_only:
-            qs = qs.filter(is_read=False)
-        qs = qs.order_by("-created_at")[:100]
-        return Response(NotificationSerializer(qs, many=True).data)
+        data = CSRShortlistController.list(_csr(request))
+        items = ShortlistItemSerializer(data["items"], many=True).data
+        return Response({"items": items}, status=status.HTTP_200_OK)
 
 
-class MarkNotificationReadView(APIView):
-    permission_classes = [IsAuthenticated]
+# ---- 4) Commit Page ----------------------------------------------------------
 
-    def post(self, request, notif_id: int):
-        n = get_object_or_404(Notification, pk=notif_id, recipient=request.user)
-        if not n.is_read:
-            n.is_read = True
-            n.save(update_fields=["is_read"])
-        return Response({"ok": True})
+class CSRCommitListView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def get(self, request):
+        data = CSRCommitController.list(_csr(request))
+        # Controller returns {"items": [...]} where each is request-like
+        items = RequestListSerializer(data["items"], many=True).data
+        return Response({"items": items}, status=status.HTTP_200_OK)
 
 
-class MarkAllNotificationsReadView(APIView):
-    permission_classes = [IsAuthenticated]
+# ---- 5) Match Details --------------------------------------------------------
+
+class CSRMatchSuggestView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def get(self, request, request_id: str):
+        data = CSRMatchController.suggest(request_id)  # {"suggestions": [{cv_id, score, reason}, ...]}
+        suggestions = CVSuggestionSerializer(data["suggestions"], many=True).data
+        return Response({"suggestions": suggestions}, status=status.HTTP_200_OK)
+
+
+class CSRMatchAssignmentPoolView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    class _Payload(serializers.Serializer):
+        cv_ids = serializers.ListField(child=serializers.CharField(), min_length=1, max_length=3)
+
+    def get(self, request, request_id: str):
+        data = CSRMatchController.get_assignment_pool(request_id)
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request, request_id: str):
+        payload = self._Payload(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = CSRMatchController.set_assignment_pool(request_id, payload.validated_data["cv_ids"])
+        return Response(data, status=status.HTTP_200_OK)  # already shaped; optionally use MatchQueueSerializer
+
+
+class CSRSendOffersView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    class _Payload(serializers.Serializer):
+        timeout_minutes = serializers.IntegerField(min_value=1, default=30, required=False)
+
+    def post(self, request, request_id: str):
+        payload = self._Payload(data=request.data)
+        payload.is_valid(raise_exception=True)
+        timeout = payload.validated_data.get("timeout_minutes", 30)
+        data = CSRMatchController.send_offers(request_id, timeout)
+        return Response(data, status=status.HTTP_200_OK)  # optionally MatchQueueSerializer
+
+
+class CVCandidateDecisionView(APIView):
+    permission_classes = [IsAuthenticated]  # adjust if CV auth differs
+
+    def post(self, request, request_id: str, cv_id: str):
+        ser = CVDecisionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = CSRMatchController.cv_decision(request_id, cv_id, ser.validated_data["accepted"])
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class DormantSweepView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
 
     def post(self, request):
-        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
-        return Response({"ok": True})
+        data = CSRMatchController.sweep_dormant()
+        return Response(data, status=status.HTTP_200_OK)
+
+
+# ---- 6) Notifications --------------------------------------------------------
+
+class CSRNotificationsView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def get(self, request):
+        data = CSRNotificationController.list(request.user)  # {"items":[...]}
+        return Response(NotificationSerializer(data["items"], many=True).data, status=status.HTTP_200_OK)
+
+
+# ---- 7) Completed Requests & Claims -----------------------------------------
+
+class CSRCompletedView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def get(self, request):
+        data = CSRCompletedController.list(_csr(request))  # {"items":[...]}
+        return Response(RequestListSerializer(data["items"], many=True).data, status=status.HTTP_200_OK)
+
+
+class CSRCompletedClaimsView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def get(self, request, request_id: str):
+        data = CSRCompletedController.claims(request_id)  # {"claims":[...]}
+        return Response(ClaimReportSerializer(data["claims"], many=True).data, status=status.HTTP_200_OK)
+
+
+class CSRClaimDecisionView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def post(self, request, claim_id: str):
+        ser = ClaimDecisionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        action = ser.validated_data["action"]
+        if action == "reimburse":
+            data = CSRCompletedController.reimburse(claim_id)
+        else:
+            data = CSRCompletedController.reject(claim_id)
+        return Response(data, status=status.HTTP_200_OK)

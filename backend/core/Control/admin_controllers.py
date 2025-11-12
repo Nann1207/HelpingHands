@@ -19,7 +19,10 @@ from core.entity.admin_entities import (
     RequestEntity, ProfileEntity, FlagEntity
 )
 
-#This is AdminMetricsController
+
+TRACKED_REQUEST_STATUSES = ("review", "pending", "rejected", "active", "complete")
+
+
 class AdminMetricsController:
 
     #To get the metrics for the dashboard
@@ -67,12 +70,12 @@ class AdminMetricsController:
 
         for row in qs:
             key = row["bucket"].strftime(fmt) if hasattr(row["bucket"], "strftime") else str(row["bucket"])
+            status = row["status"]
+            if status not in TRACKED_REQUEST_STATUSES:
+                continue  # Ignore statuses (like committed) that the PA admin dashboard does not display
             if key not in buckets: #If the bucket (date) does not exist, create it and intialise all status to be 0.
-                buckets[key] = {
-                    "date": key,
-                    "review": 0, "pending": 0, "rejected": 0, "active": 0, "complete": 0,
-                }
-            buckets[key][row["status"]] += row["cnt"] #It adds the count of requests row["cnt"] to the correct status like pending or review" inside that date’s bucket
+                buckets[key] = {"date": key, **{s: 0 for s in TRACKED_REQUEST_STATUSES}}
+            buckets[key][status] += row["cnt"] #It adds the count of requests row["cnt"] to the correct status like pending or review" inside that date’s bucket
 
         requests_by_status = list(buckets.values()) #Covert to list
 

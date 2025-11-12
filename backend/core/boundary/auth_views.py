@@ -35,7 +35,7 @@ def auth_login(request):
     role = _infer_role(user)
     redirect_to = {
         "ADMIN": "/pa_dashboard/",
-        "CSR":   "/csr/home/",
+        "CSR":   "/csr_dashboard/",
         "CV":    "/cv/home/",
         "PIN":   "/pin_dashboard/",
     }.get(role, "/")

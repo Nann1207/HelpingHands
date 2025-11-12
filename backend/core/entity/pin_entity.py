@@ -101,7 +101,7 @@ class PinEntity:
         claim.status = ClaimStatus.DISPUTED_BY_PIN
         claim.save(update_fields=["status"])
         return dispute
-    # create a staticmethod 
+    
     @staticmethod
     def create_flagged_request(*, request, flag_type: str, moderation_reason: str = "", resolved: bool = False):
         """

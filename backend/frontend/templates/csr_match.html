@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Match · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .table{width:100%;border-collapse:collapse}
+    .table th{ text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem }
+    .table td{ padding:.6rem .75rem; border-top:1px solid #eee }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/></svg>
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Requests</a>
+        <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Shortlist</a>
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Match</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <h1 class="text-2xl font-bold">Committed Requests</h1>
+    <section class="p-4 rounded-xl bg-white border">
+      <table class="table">
+        <thead><tr><th>ID</th><th>PIN</th><th>Category</th><th>Status</th><th></th></tr></thead>
+        <tbody data-table="committedRows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const qs = (sel, root=document) => root.querySelector(sel);
+    const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
+
+    async function fetchJSON(url, opts={}) {
+      const resp = await fetch(url, { credentials:"include", headers:{ "X-CSRFToken": getCSRF(), "Content-Type":"application/json" }, ...opts });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    }
+
+    function rowHTML(r){
+      return `
+        <tr class="hover:bg-gray-50">
+          <td class="font-mono">${r.id}</td>
+          <td>${r.pin}</td>
+          <td>${r.category}</td>
+          <td><span class="px-2 py-0.5 rounded-full text-xs border">${r.status}</span></td>
+          <td><a class="text-blue-600 hover:underline" href="/csr_match_detail/${encodeURIComponent(r.id)}/">Open</a></td>
+        </tr>
+      `;
+    }
+
+    async function loadCSRCommitted(){
+      const data = await fetchJSON("/api/csr/committed/");
+      const body = qs('[data-table="committedRows"]');
+      body.innerHTML = (data.items || []).map(rowHTML).join("");
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      await loadCSRCommitted();
+    });
+  </script>
+</body>
+</html>

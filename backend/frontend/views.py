@@ -28,3 +28,30 @@ def pin_profile_page(request): return render(request, "pin_profile.html")
 def pin_create_request_page(request): return render(request, "pin_create_request.html")
 
 def pin_chats_page(request): return render(request, "pin_chats.html")
+
+
+@role_required("CSR")
+def csr_dashboard_page(request):
+    return render(request, "csr_dashboard.html")
+
+
+@role_required("CSR")
+def csr_requests_page(request):
+    return render(request, "csr_requests.html")
+
+
+@role_required("CSR")
+def csr_shortlist_page(request):
+    return render(request, "csr_shortlist.html")
+
+
+@role_required("CSR")
+def csr_match_page(request):
+    return render(request, "csr_match.html")
+
+
+
+
+@role_required("CSR")
+def csr_match_detail_page(request, req_id):
+    return render(request, "csr_match_detail.html", {"req_id": req_id})

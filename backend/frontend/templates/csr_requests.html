@@ -6,244 +6,124 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .table { width:100%; border-collapse: collapse }
-    .table th { text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem; }
-    .table td { padding:.6rem .75rem; border-top:1px solid #eee }
-    .pill { font-size:.7rem; padding:.1rem .4rem; border:1px solid #e5e7eb; border-radius:.5rem; color:#6b7280 }
-    .btn { padding:.35rem .6rem; border-radius:.5rem; border:1px solid #e5e7eb; }
-    .btn-primary { background:#111827; color:#fff; }
-    .heart { cursor:pointer; }
-    .heart.filled { color:#ef4444 }
-    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; }
-    .modal { background:#fff; width:100%; max-width:42rem; border-radius:1rem; border:1px solid #e5e7eb; }
+    .table{width:100%;border-collapse:collapse}
+    .table th{ text-align:left; font-weight:600; font-size:.8rem; color:#6b7280; padding:.5rem .75rem }
+    .table td{ padding:.6rem .75rem; border-top:1px solid #eee }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
-  <!-- Top Bar -->
   <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/csr_requests/" class="flex items-center gap-2">
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/></svg>
         <span class="text-xl font-bold">Helping Hands (CSR)</span>
       </a>
-      <nav class="flex items-center gap-2">
-        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border bg-gray-900 text-white">Requests</a>
-        <a href="/csr_shortlisted/" class="px-3 py-1.5 rounded-md border">Shortlisted</a>
-        <a href="/csr_matching/" class="px-3 py-1.5 rounded-md border">Matching</a>
-        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">{% csrf_token %}
-          <button class="px-3 py-1.5 rounded-md bg-red-500 text-white">Log out</button>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Requests</a>
+        <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Shortlist</a>
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Match</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
         </form>
       </nav>
     </div>
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
-    <h1 class="text-2xl font-bold">Requests</h1>
+    <h1 class="text-2xl font-bold">Request Pool</h1>
 
-    <!-- Expiring soon -->
-    <section class="rounded-2xl border bg-white p-4">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="font-semibold">Requests Expiring Soon</h2>
-        <span id="soonCount" class="pill">—</span>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Request ID</th><th>Service Type</th><th>Date Created</th>
-              <th>Appointment Date</th><th>Time</th><th>Pickup Location</th><th>Service Location</th><th></th><th></th>
-            </tr>
-          </thead>
-          <tbody id="soonBody"><tr><td class="py-3 text-gray-500" colspan="9">Loading…</td></tr></tbody>
-        </table>
-      </div>
+    <section class="p-4 rounded-xl bg-white border">
+      <h2 class="font-semibold mb-2">Appointment Dates Coming Soon</h2>
+      <table class="table">
+        <thead><tr><th>ID</th><th>Category</th><th>Date</th><th>Location</th><th>Shortlists</th><th></th></tr></thead>
+        <tbody data-table="comingSoon"></tbody>
+      </table>
     </section>
 
-    <!-- All -->
-    <section class="rounded-2xl border bg-white p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="font-semibold">All requests</h2>
-        <div class="flex items-center gap-2">
-          <input id="search" placeholder="Search …" class="border rounded-md px-3 py-2 w-64" />
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Request ID</th><th>Service Type</th><th>Date Created</th>
-              <th>Appointment Date</th><th>Time</th><th>Pickup Location</th><th>Service Location</th><th></th><th></th>
-            </tr>
-          </thead>
-          <tbody id="allBody"><tr><td class="py-3 text-gray-500" colspan="9">Loading…</td></tr></tbody>
-        </table>
-      </div>
+    <section class="p-4 rounded-xl bg-white border">
+      <h2 class="font-semibold mb-2">All Requests</h2>
+      <table class="table">
+        <thead><tr><th>ID</th><th>Category</th><th>Date</th><th>Location</th><th>Shortlists</th><th></th></tr></thead>
+        <tbody data-table="allRequests"></tbody>
+      </table>
     </section>
   </main>
 
-  <!-- Commit modal -->
-  <div id="commitModal" class="modal-backdrop">
-    <div class="modal p-4">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Select up to 3 volunteers</h3>
-        <button id="closeModal" class="btn">Close</button>
-      </div>
-      <div id="modalBody" class="mt-3">
-        <div class="text-sm text-gray-600">Loading suggestions…</div>
-      </div>
-      <div class="mt-4 flex items-center justify-end gap-2">
-        <button id="confirmCommit" class="btn btn-primary">Create queue & start</button>
-      </div>
-    </div>
-  </div>
-
   <script>
-    // ------- helpers -------
-    const byId = (id)=>document.getElementById(id);
-    const soonBody = byId("soonBody");
-    const allBody  = byId("allBody");
-    const searchEl = byId("search");
+    const qs = (sel, root=document) => root.querySelector(sel);
+    const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
+    const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
 
-    async function jget(u){ const r=await fetch(u,{credentials:"include"}); if(!r.ok) throw new Error(r.status); return r.json(); }
-    async function jpost(u,body){ const r=await fetch(u,{method:"POST",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(r.status); return r.json(); }
-
-    function fmtTime(t){ return (t||"").slice(0,5); }
-    function withinDays(iso, days){
-      const d=new Date(iso); const now=new Date();
-      const diff=(d - now)/(1000*60*60*24); return diff>=0 && diff<=days;
+    async function fetchJSON(url, opts={}) {
+      const resp = await fetch(url, { credentials:"include", headers:{ "X-CSRFToken": getCSRF(), "Content-Type":"application/json" }, ...opts });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
     }
 
-    function row(req){
-      const id=req.id, fav=`<button class="heart" data-id="${id}" title="Shortlist">❤</button>`;
-      const commit=`<button class="btn" data-commit="${id}">Commit</button>`;
-      return `<tr>
-        <td class="font-medium">${id}</td>
-        <td>${req.service_type}</td>
-        <td>${(req.created_at||"").slice(0,10)}</td>
-        <td>${req.appointment_date||""}</td>
-        <td>${fmtTime(req.appointment_time)}</td>
-        <td>${req.pickup_location||""}</td>
-        <td>${req.service_location||""}</td>
-        <td class="text-center">${fav}</td>
-        <td class="text-right">${commit}</td>
-      </tr>`;
-    }
-
-    let ALL=[], SOON=[];
-    async function load(){
-      const data = await jget("/api/csr/requests/pending/");
-      ALL = data||[];
-      const txt = (q)=>q.toLowerCase();
-
-      // soon = next 14 days
-      SOON = ALL.filter(r=> withinDays(r.appointment_date, 14))
-                .sort((a,b)=> (a.appointment_date<b.appointment_date? -1:1));
-      soonBody.innerHTML = SOON.length ? SOON.map(row).join("") : `<tr><td class="py-3 text-gray-500" colspan="9">None</td></tr>`;
-      byId("soonCount").textContent = `${SOON.length}`;
-
-      renderAll();
-    }
-
-    function renderAll(){
-      const q = (searchEl.value||"").trim().toLowerCase();
-      const arr = q ? ALL.filter(r =>
-        [r.id, r.service_type, r.pickup_location, r.service_location].join(" ").toLowerCase().includes(q)
-      ) : ALL;
-      allBody.innerHTML = arr.length ? arr.map(row).join("") : `<tr><td class="py-3 text-gray-500" colspan="9">No results.</td></tr>`;
-    }
-
-    // shortlist toggle
-    document.addEventListener("click", async (e)=>{
-      const t=e.target;
-      // shortlist
-      if(t.matches(".heart")){
-        const reqId=t.getAttribute("data-id");
-        const filled=t.classList.contains("filled");
-        try{
-          if(filled){
-            await fetch("/api/csr/shortlists/", {method:"DELETE",credentials:"include",headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:reqId})});
-            t.classList.remove("filled");
-          }else{
-            await jpost("/api/csr/shortlists/", {request_id:reqId});
-            t.classList.add("filled");
-          }
-        }catch{ alert("Failed to update shortlist."); }
-      }
-      // commit (open modal)
-      if(t.hasAttribute("data-commit")){
-        const id=t.getAttribute("data-commit");
-        openCommitModal(id);
-      }
-      if(t.id==="closeModal"){ closeCommitModal(); }
-      if(t.id==="confirmCommit"){ await confirmCommitFlow(); }
-    });
-
-    searchEl.addEventListener("input", renderAll);
-
-    // ------- commit modal & queue flow -------
-    const modal = byId("commitModal");
-    const modalBody = byId("modalBody");
-    let currentReq = null;
-    let selected = new Set();
-
-    function closeCommitModal(){ modal.style.display="none"; currentReq=null; selected.clear(); }
-    async function openCommitModal(reqId){
-      currentReq = reqId;
-      selected.clear();
-      modal.style.display="flex";
-      modalBody.innerHTML = `<div class="text-sm text-gray-600">Loading suggestions…</div>`;
-      try{
-        const sugg = await jget(`/api/csr/requests/${encodeURIComponent(reqId)}/suggestions/`);
-        modalBody.innerHTML = renderSuggestions(sugg);
-      }catch{
-        modalBody.innerHTML = `<div class="text-sm text-red-600">Failed to load suggestions.</div>`;
-      }
-    }
-
-    function renderSuggestions(list){
-      if(!list || !list.length) return `<div class="text-sm text-gray-600">No suggestions available.</div>`;
+    function rowHTML(r){
       return `
-        <div class="text-xs text-gray-500 mb-2">Auto-suggested (pick up to 3)</div>
-        <div class="max-h-80 overflow-auto divide-y">
-          ${list.map(cv => `
-            <label class="flex items-center gap-3 p-2">
-              <input type="checkbox" class="cvpick" value="${cv.id}">
-              <div class="flex-1">
-                <div class="font-medium">${cv.name} <span class="text-gray-400">(${cv.id})</span></div>
-                <div class="text-xs text-gray-600">Pref: ${cv.service_category_preference} · Completed ${cv.completed_count} · Active ${cv.active_load} · Lang ${cv.main_language}${cv.second_language?"/"+cv.second_language:""}</div>
-              </div>
-              ${cv.svc_match ? '<span class="pill">service match</span>' : ''}
-            </label>
-          `).join("")}
-        </div>
+        <tr class="hover:bg-gray-50">
+          <td class="font-mono">${r.id}</td>
+          <td>${r.category}</td>
+          <td>${r.appointment_date}</td>
+          <td>${r.location}</td>
+          <td>${r.shortlist_count ?? 0}</td>
+          <td class="space-x-2">
+            <button class="px-2 py-1 border rounded-md" data-action="shortlist" data-id="${r.id}">Shortlist</button>
+            <button class="px-2 py-1 bg-gray-900 text-white rounded-md" data-action="commit" data-id="${r.id}">Commit</button>
+          </td>
+        </tr>
       `;
     }
 
-    modalBody.addEventListener("change",(e)=>{
-      if(!e.target.matches(".cvpick")) return;
-      const id=e.target.value;
-      if(e.target.checked){ selected.add(id); }
-      else { selected.delete(id); }
-      if(selected.size>3){
-        // uncheck this one
-        e.target.checked=false; selected.delete(id);
-        alert("Select at most 3 volunteers.");
-      }
-    });
+    function wireRowActions(root){
+      root.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button");
+        if(!btn) return;
+        const id = btn.getAttribute("data-id");
+        const action = btn.getAttribute("data-action");
 
-    async function confirmCommitFlow(){
-      if(!currentReq) return;
-      if(selected.size===0){ alert("Pick at least 1 volunteer."); return; }
-      try{
-        await jpost(`/api/csr/requests/${encodeURIComponent(currentReq)}/queue/`, { cv_ids: Array.from(selected) });
-        await jpost(`/api/csr/requests/${encodeURIComponent(currentReq)}/queue/start/`, { hours_to_respond: 1 });
-        closeCommitModal();
-        alert("Matching queue started.");
-      }catch(e){
-        alert("Failed to create/start queue.");
-      }
+        if (action === "shortlist") {
+          await shortlistRequest(id);
+        } else if (action === "commit") {
+          await commitRequest(id);
+        }
+        await loadCSRRequestPool(); // refresh lists
+      });
     }
 
-    window.addEventListener("DOMContentLoaded", load);
+    async function shortlistRequest(requestId){
+      await fetchJSON(`/api/csr/requests/${encodeURIComponent(requestId)}/shortlist/`, { method:"POST", body:"{}" });
+    }
+
+    async function commitRequest(requestId){
+      await fetchJSON(`/api/csr/requests/${encodeURIComponent(requestId)}/commit/`, { method:"POST", body:"{}" });
+    }
+
+    function renderComingSoon(rows){
+      const body = qs('[data-table="comingSoon"]');
+      body.innerHTML = rows.map(rowHTML).join("");
+      wireRowActions(body);
+    }
+
+    function renderAllRequests(rows){
+      const body = qs('[data-table="allRequests"]');
+      body.innerHTML = rows.map(rowHTML).join("");
+      wireRowActions(body);
+    }
+
+    async function loadCSRRequestPool(){
+      const data = await fetchJSON("/api/csr/requests/");
+      renderComingSoon(data.coming_soon || []);
+      renderAllRequests(data.all_requests || []);
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      await loadCSRRequestPool();
+    });
   </script>
 </body>
 </html>
