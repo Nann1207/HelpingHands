@@ -1,0 +1,1 @@
+pip install django djangorestframework djangorestframework-simplejwt faker psycopg2-binary django-cors-headers python-dotenv
