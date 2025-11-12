@@ -130,15 +130,14 @@
       }
     }
 
-<<<<<<< Updated upstream
+
     function isImageUrl(url){
       if (!url) return false;
       const target = url.split("?")[0].toLowerCase();
       return /\.(png|jpe?g|gif|bmp|webp|svg)$/.test(target);
     }
 
-=======
->>>>>>> Stashed changes
+
     function badgeClass(status){
       switch (status) {
         case "verified_by_pin": return "bg-green-50 text-green-700 border-green-200";
@@ -233,11 +232,10 @@
       const description = claim.description || "";
       const category = claim.category || "";
       const payment = claim.payment_method || claim.payment || "";
-<<<<<<< Updated upstream
+
       const receiptUrl = claim.receipt_url || "";
       const receiptIsImage = isImageUrl(receiptUrl);
-=======
->>>>>>> Stashed changes
+
 
       const actions = canDecide(status)
         ? `
@@ -273,7 +271,7 @@
               PIN ${pinVerified ? "verified this claim." : "has not verified yet."}
             </p>
           </div>
-<<<<<<< Updated upstream
+
           ${receiptUrl ? `
             <div class="space-y-2 border-t border-dashed border-gray-200 pt-3">
               <p class="text-sm font-medium text-gray-700">Receipt</p>
@@ -286,8 +284,7 @@
               </a>
             </div>
           ` : ""}
-=======
->>>>>>> Stashed changes
+
           ${actions}
         </article>
       `;
