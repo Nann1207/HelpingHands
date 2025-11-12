@@ -36,7 +36,7 @@ def auth_login(request):
     redirect_to = {
         "ADMIN": "/pa_dashboard/",
         "CSR":   "/csr_dashboard/",
-        "CV":    "/cv/home/",
+        "CV":    "/cv_dashboard/",
         "PIN":   "/pin_dashboard/",
     }.get(role, "/")
 

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CV · Request Details · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/cv_dashboard/" class="font-semibold hover:underline">← Back to Dashboard</a>
+      <nav class="flex items-center gap-3">
+        <a id="openChatLink" href="#" class="px-3 py-1.5 rounded-md border hover:bg-gray-100 hidden">Open Chat</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <section class="p-4 border border-black rounded-xl bg-white">
+      <h1 class="text-xl font-bold">Request <span id="reqId">—</span></h1>
+      <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <div><span class="text-gray-500">Status:</span> <span id="reqStatus">—</span></div>
+        <div><span class="text-gray-500">Service:</span> <span id="reqService">—</span></div>
+        <div><span class="text-gray-500">Appointment:</span> <span id="reqAppt">—</span></div>
+        <div><span class="text-gray-500">Route:</span> <span id="reqRoute">—</span></div>
+        <div class="md:col-span-2"><span class="text-gray-500">Description:</span> <span id="reqDesc">—</span></div>
+        <div class="md:col-span-2"><span class="text-gray-500">PIN Prefs:</span> <span id="pinPrefs">—</span></div>
+      </div>
+      <div class="mt-4 flex gap-2">
+        <button id="btnComplete" class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Mark Complete</button>
+        <a id="btnClaim" href="#" class="px-3 py-2 rounded-md border hover:bg-gray-100">Report Claim</a>
+      </div>
+    </section>
+
+    <section class="p-4 border border-black rounded-xl bg-white">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Risk & Safety Tips</h2>
+        <button id="btnLoadTips" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Refresh Tips</button>
+      </div>
+      <ul id="tipsList" class="mt-3 list-disc pl-6 text-sm space-y-1"></ul>
+    </section>
+  </main>
+
+  <script>
+    function qs(s){return document.querySelector(s)}
+    function getCSRF(){return document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1] || "";}
+    async function j(u,o={}){
+      const opts = {credentials:"include", ...o};
+      if(opts.method && opts.method.toUpperCase() !== "GET"){
+        opts.headers = { ...(opts.headers || {}), "X-CSRFToken": getCSRF() };
+      }
+      const r=await fetch(u,opts);
+      if(!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    const reqId = location.pathname.split("/").filter(Boolean).pop(); // /cv_request/<id>/
+    let chatId = null;
+
+    async function loadDetail(){
+      const d = await j(`/api/cv/requests/${reqId}/`);
+      qs("#reqId").textContent = d.id;
+      qs("#reqStatus").textContent = d.status;
+      qs("#reqService").textContent = d.service_type;
+      qs("#reqAppt").textContent = `${d.appointment_date} ${d.appointment_time?.slice(0,5) ?? ""}`;
+      qs("#reqRoute").textContent = `${d.pickup_location} → ${d.service_location}`;
+      qs("#reqDesc").textContent = d.description || "—";
+      qs("#pinPrefs").textContent = `Gender=${d.pin_gender_pref || "—"}, Language=${d.pin_lang_pref || "—"}`;
+
+      chatId = d.chat_id;
+      const chatLink = qs("#openChatLink");
+      if(chatId){
+        chatLink.href = `/cv_chats/?open=${chatId}`;
+        chatLink.classList.remove("hidden");
+      }else{
+        // create chat if missing
+        try{
+          const created = await j(`/api/requests/${d.id}/chat/`, { method:"POST" });
+          if(created?.id){
+            chatId = created.id;
+            chatLink.href = `/cv_chats/?open=${chatId}`;
+            chatLink.classList.remove("hidden");
+          }
+        }catch(e){}
+      }
+      qs("#btnClaim").href = `/cv_claims/?newFor=${d.id}`;
+    }
+
+    async function loadTips(){
+      qs("#tipsList").innerHTML = `<li class="text-gray-500">Loading…</li>`;
+      try{
+        const t = await j(`/api/cv/requests/${reqId}/safety_tips/`);
+        const tips = t.tips || [];
+        qs("#tipsList").innerHTML = tips.map(x=>`<li>${x}</li>`).join("") || `<li class="text-gray-500">No tips.</li>`;
+      }catch(e){
+        qs("#tipsList").innerHTML = `<li class="text-gray-500">Failed to load tips.</li>`;
+      }
+    }
+
+    async function completeReq(){
+      await j(`/api/cv/requests/${reqId}/complete/`, { method:"POST" });
+      await loadDetail();
+      await loadTips();
+      alert("Marked complete.");
+    }
+
+    qs("#btnLoadTips").addEventListener("click", loadTips);
+    qs("#btnComplete").addEventListener("click", completeReq);
+
+    window.addEventListener("DOMContentLoaded", async ()=>{
+      await loadDetail();
+      await loadTips();
+    });
+  </script>
+</body>
+</html>

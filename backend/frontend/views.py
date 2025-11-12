@@ -60,3 +60,22 @@ def csr_claims_page(request):
 @role_required("CSR")
 def csr_match_detail_page(request, req_id):
     return render(request, "csr_match_detail.html", {"req_id": req_id})
+
+
+# --- Corporate Volunteer (CV) ---
+
+@role_required("CV")
+def cv_dashboard_page(request):
+    return render(request, "cv_dashboard.html")
+
+@role_required("CV")
+def cv_request_detail_page(request, req_id):
+    return render(request, "cv_request_detail.html", {"req_id": req_id})
+
+@role_required("CV")
+def cv_claims_page(request):
+    return render(request, "cv_claims.html")
+
+@role_required("CV")
+def cv_chats_page(request):
+    return render(request, "cv_chats.html")

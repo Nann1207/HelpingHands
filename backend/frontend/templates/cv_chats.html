@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Messages · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/cv_dashboard/" class="font-semibold hover:underline">← Back to Dashboard</a>
+      <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+        {% csrf_token %}
+        <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+          Log out
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+    <section class="md:col-span-1 rounded-xl border bg-white">
+      <div class="p-3 border-b font-semibold">My Chats (Active & Completed)</div>
+      <div id="chatList" class="divide-y"></div>
+    </section>
+
+    <section class="md:col-span-2 rounded-xl border bg-white flex flex-col">
+      <div id="chatHeader" class="p-3 border-b text-sm text-gray-600">Select a chat…</div>
+      <div id="messages" class="flex-1 p-3 space-y-2 overflow-y-auto min-h-[300px]"></div>
+      <form id="sendForm" class="p-3 border-t flex gap-2">
+        <input id="msg" class="flex-1 border rounded-md px-3 py-2" placeholder="Type a message…" />
+        <button class="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800">Send</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    function qs(s){return document.querySelector(s)}
+    function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+    async function j(u,o){const r=await fetch(u,{credentials:"include",...o}); if(!r.ok) throw new Error(await r.text()); return r.json();}
+
+    const chatList = qs("#chatList");
+    const messages = qs("#messages");
+    const sendForm = qs("#sendForm");
+    const msgInput = qs("#msg");
+    const chatHeader = qs("#chatHeader");
+    let activeChatId = null;
+
+    function li(c){
+      const open = c.is_open ? `<span class="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">Open</span>`
+                             : `<span class="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Closed</span>`;
+      return `<button data-id="${c.id}" class="w-full text-left px-3 py-2 hover:bg-gray-50">
+        <div class="font-medium">${c.service_type}</div>
+        <div class="text-xs text-gray-500">Req ${c.request_id} • ${open}</div>
+      </button>`;
+    }
+
+    async function loadChats(){
+      // same endpoints as PIN, filtered by current CV
+      const open = await j("/api/me/chats/?status=open");
+      const closed = await j("/api/me/chats/?status=closed");
+      chatList.innerHTML = `
+        <div class="px-3 py-1 text-xs uppercase text-gray-500">Open</div>
+        ${(open||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No open chats</div>'}
+        <div class="px-3 py-1 text-xs uppercase text-gray-500">Past</div>
+        ${(closed||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No past chats</div>'}
+      `;
+      chatList.querySelectorAll("button[data-id]").forEach(b=>{
+        b.addEventListener("click", ()=> openChat(b.getAttribute("data-id")));
+      });
+
+      // autoselect if ?open=<id>
+      const url = new URL(location.href);
+      const openId = url.searchParams.get("open");
+      if (openId) openChat(openId);
+    }
+
+    async function openChat(id){
+      activeChatId = id;
+      chatHeader.textContent = `Chat ${id}`;
+      const msgs = await j(`/api/chats/${id}/messages/`);
+      messages.innerHTML = msgs.map(m => `
+        <div class="text-sm">
+          <div class="text-[11px] text-gray-500">${m.sender} · ${m.created_at?.replace("T"," ").slice(0,16)}</div>
+          <div class="px-3 py-2 bg-gray-100 inline-block rounded-md mt-0.5">${m.body}</div>
+        </div>`).join("");
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    sendForm.addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      if(!activeChatId) return;
+      const body = (msgInput.value||"").trim();
+      if(!body) return;
+      try{
+        await j(`/api/chats/${activeChatId}/messages/`, {
+          method:"POST",
+          headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},
+          body: JSON.stringify({ body })
+        });
+        msgInput.value = "";
+        openChat(activeChatId);
+      }catch(e){ alert("Failed to send (maybe chat closed)."); }
+    });
+
+    window.addEventListener("DOMContentLoaded", loadChats);
+  </script>
+</body>
+</html>

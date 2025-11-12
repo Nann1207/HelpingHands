@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import logging
 from datetime import date
 from typing import Dict, Any
 
@@ -8,10 +9,18 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied, ValidationError
 
-from core.models import Request, RequestStatus, CV
+try:
+    import requests
+except ImportError: 
+    requests = None
+
+
+logger = logging.getLogger(__name__)
+
+from core.models import Request, RequestStatus, CV, MatchQueueStatus
 from core.entity.cv_entities import CvEntity
-from core.Control.chat_controller import ChatController  # reuse completion + chat handling
-from core.Control.csr_controller import CSRMatchController  # reuse CV decision flow
+from core.Control.chat_controller import ChatController  # reuse
+from core.Control.csr_controller import CSRMatchController  # reuse 
 
 class CvController:
     """
@@ -32,6 +41,17 @@ class CvController:
         if not hasattr(user, "cv"):
             raise PermissionDenied("Not a CV user.")
         return user.cv
+
+    @staticmethod
+    def _has_pending_offer(req: Request, cv_id: str) -> bool:
+        mq = getattr(req, "match_queue", None)
+        if not mq or mq.status != MatchQueueStatus.ACTIVE:
+            return False
+        return (
+            (mq.current_index == 1 and mq.cv1queue_id == cv_id)
+            or (mq.current_index == 2 and mq.cv2queue_id == cv_id)
+            or (mq.current_index == 3 and mq.cv3queue_id == cv_id)
+        )
 
     # ---------- dashboard ----------
 
@@ -57,8 +77,8 @@ class CvController:
     @staticmethod
     def request_detail(*, user, req_id: str) -> Request:
         cv = CvController._ensure_is_cv(user)
-        req = get_object_or_404(Request.objects.select_related("pin", "cv"), pk=req_id)
-        if req.cv_id != cv.id:
+        req = get_object_or_404(Request.objects.select_related("pin", "cv", "match_queue"), pk=req_id)
+        if req.cv_id != cv.id and not CvController._has_pending_offer(req, cv.id):
             raise PermissionDenied("Not your request.")
         return req
 
@@ -82,8 +102,8 @@ class CvController:
     @staticmethod
     def safety_tips(*, user, req_id: str) -> dict:
         cv = CvController._ensure_is_cv(user)
-        req = get_object_or_404(Request.objects.select_related("pin"), pk=req_id)
-        if req.cv_id != cv.id:
+        req = get_object_or_404(Request.objects.select_related("pin", "match_queue"), pk=req_id)
+        if req.cv_id != cv.id and not CvController._has_pending_offer(req, cv.id):
             raise PermissionDenied("Not your request.")
 
         # Prepare input
@@ -112,37 +132,54 @@ class CvController:
         }
 
         api_key = getattr(settings, "SEA_LION_LLAMA_API_KEY", None)
-        endpoint = getattr(settings, "SEA_LION_LLAMA_ENDPOINT", None)
+        endpoint = getattr(settings, "SEA_LION_LLAMA_ENDPOINT", "https://api.sea-lion.ai/v1/chat/completions")
+        model = getattr(settings, "SEA_LION_LLAMA_MODEL", "aisingapore/Gemma-SEA-LION-v4-27B-IT")
 
         # Try remote if configured; fallback to rules if not or on failure
-        if api_key and endpoint:
+        if api_key and requests:
             try:
-                resp = Request.post(
-                    endpoint.rstrip("/") + "/v1/tips",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    data=json.dumps(prompt),
-                    timeout=6,
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a safety coach for a volunteer transport platform. "
+                                "Return ONLY a JSON array (no text) of 3-6 concise safety tips."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": json.dumps(prompt),
+                        },
+                    ],
+                    "max_tokens": 200,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                }
+                resp = requests.post(
+                    endpoint.rstrip("/"),
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=10,
                 )
-                if resp.ok:
-                    payload = resp.json()
-                    tips = payload.get("tips") or payload.get("data") or []
-                    if isinstance(tips, list) and tips:
-                        return {"request_id": req.id, "tips": tips}
-            except Exception:
-                pass
+                resp.raise_for_status()
+                parsed = CvController._parse_llm_tips(resp.json())
+                if parsed:
+                    logger.info("Sea Lion safety tips generated for request %s via %s", req.id, endpoint)
+                    return {"request_id": req.id, "tips": parsed}
+            except (requests.RequestException, ValueError, KeyError) as exc:
+                logger.warning("Sea Lion safety tips fetch failed for request %s: %s", req.id, exc)
+        elif api_key and not requests:
+            logger.warning("Sea Lion API key configured but 'requests' not installed; using fallback tips.")
+        else:
+            logger.info("Sea Lion API not configured; using fallback tips.")
 
-        # Fallback heuristic
-        tips = [
-            "Verify identity at pickup; match name and address.",
-            "Keep communication in-app; avoid sharing personal numbers.",
-            "Share trip details with the platform if travelling alone.",
-        ]
-        if req.service_type.lower().startswith("vaccination"):
-            tips.append("Ensure medical documents are brought and stored safely.")
-        if age and age >= 65:
-            tips.append("Plan for mobility support; allow extra time for transitions.")
-        if pin and pin.preferred_cv_gender == "female":
-            tips.append("Prefer public, well-lit places for handoffs when appropriate.")
+        tips = CvController._fallback_tips(req=req, age=age, pin=pin)
+        logger.info("Fallback safety tips returned for request %s", req.id)
         return {"request_id": req.id, "tips": tips}
 
     # ---------- claims ----------
@@ -160,6 +197,60 @@ class CvController:
     def list_claims(*, user):
         cv = CvController._ensure_is_cv(user)
         return CvEntity.list_my_claims(cv_id=cv.id)
+
+    # ---------- helpers ----------
+
+    @staticmethod
+    def _parse_llm_tips(payload):
+        if not isinstance(payload, dict):
+            return None
+        choices = payload.get("choices")
+        if not choices:
+            return None
+        message = choices[0].get("message") if isinstance(choices[0], dict) else None
+        content = (message or {}).get("content") if isinstance(message, dict) else None
+        if not content or not isinstance(content, str):
+            return None
+        content = content.strip()
+        if not content:
+            return None
+        tips = None
+        try:
+            tips = json.loads(content)
+            if isinstance(tips, dict):
+                tips = tips.get("tips")
+        except ValueError:
+            tips = None
+        if tips is None:
+            tips = [
+                part.strip(" -•\t")
+                for part in content.splitlines()
+                if part.strip()
+            ]
+        if isinstance(tips, str):
+            tips = [tips]
+        if isinstance(tips, list):
+            cleaned = [t.strip() for t in tips if isinstance(t, str) and t.strip()]
+            return cleaned or None
+        return None
+
+    @staticmethod
+    def _fallback_tips(*, req, age, pin):
+        tips = [
+            "Verify the rider's identity at pickup and confirm the appointment details.",
+            "Keep communication inside the Helping Hands channels; avoid sharing personal numbers.",
+            "Share your live status with the platform if travelling to an unfamiliar location.",
+        ]
+        service = (req.service_type or "").lower()
+        if service.startswith("vaccination") or "medical" in service:
+            tips.append("Double-check that medical documents and medications are packed securely.")
+        if service.startswith("legal") or "court" in service:
+            tips.append("Plan extra time for security checkpoints and document checks.")
+        if age and age >= 65:
+            tips.append("Allow additional time for mobility support and ensure safe entry/exit of vehicles.")
+        if pin and getattr(pin, "preferred_cv_gender", "") == "female":
+            tips.append("Prioritize well-lit, public meeting points when possible.")
+        return tips
 
 
 class CvClaimController:

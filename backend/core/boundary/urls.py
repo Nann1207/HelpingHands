@@ -33,11 +33,6 @@ from .csr_views import (
     CSRClaimDecisionView,
 )
 
-# CV
-from .cv_views import (
-    CvMyRequestsView, CvCompleteRequestView, CvSafetyTipsView, CvCreateClaimView
-)
-
 from .chat_views import MyChatsView, RequestChatView, ChatMessagesListCreate, CompleteRequestView
 
 urlpatterns = [
@@ -71,7 +66,7 @@ urlpatterns = [
     # GET /api/admin/reports/requests.csv
     path("admin/reports/requests.csv", AdminReportView.as_view(), name="admin-report-requests"),
 
-# ----- PIN -----
+    # ----- PIN -----
     path("pin/requests/",            PinRequestCreateView.as_view(),     name="pin-requests-create"),   
     path("pin/my/requests/",         PinMyRequestsView.as_view(),        name="pin-requests-list"),     
     path("pin/profile/otp/start/",   PinStartProfileUpdateView.as_view(), name="pin-profile-otp-start"),
@@ -83,10 +78,14 @@ urlpatterns = [
     path("pin/claims/<str:claim_id>/dispute/", PinDisputeClaimView.as_view(), name="pin-claim-dispute"),
 
     # ----- CV -----
-    path("cv/requests/",                      CvMyRequestsView.as_view(),       name="cv-requests-list"),
-    path("cv/requests/<str:req_id>/complete/", CvCompleteRequestView.as_view(), name="cv-request-complete"),
+    path("cv/dashboard/",                        CvDashboardView.as_view(),     name="cv-dashboard"),
+    path("cv/requests/",                         CvMyRequestsView.as_view(),    name="cv-requests-list"),
+    path("cv/requests/<str:req_id>/",            CvRequestDetailView.as_view(), name="cv-request-detail"),
+    path("cv/requests/<str:req_id>/decision/",   CvOfferDecisionView.as_view(), name="cv-request-decision"),
+    path("cv/requests/<str:req_id>/complete/",   CvCompleteRequestView.as_view(), name="cv-request-complete"),
     path("cv/requests/<str:req_id>/safety_tips/", CvSafetyTipsView.as_view(),   name="cv-request-safety"),
     path("cv/requests/<str:req_id>/claims/",     CvCreateClaimView.as_view(),   name="cv-request-claims"),
+    path("cv/claims/",                           CvMyClaimsView.as_view(),      name="cv-claims"),
 
     # ----- Chat -----
     path("me/chats/",                    MyChatsView.as_view(),            name="me-chats"),
@@ -115,20 +114,4 @@ urlpatterns = [
     path("csr/completed/", CSRCompletedView.as_view()),
     path("csr/completed/<str:request_id>/claims/", CSRCompletedClaimsView.as_view()),
     path("csr/claims/<str:claim_id>/decision/", CSRClaimDecisionView.as_view()),
-
-
-
-    path("api/cv/dashboard/", CvDashboardView.as_view()),
-    path("api/cv/requests/", CvMyRequestsView.as_view()),
-    path("api/cv/requests/<str:req_id>/", CvRequestDetailView.as_view()),
-    path("api/cv/requests/<str:req_id>/decision/", CvOfferDecisionView.as_view()),
-    path("api/cv/requests/<str:req_id>/safety_tips/", CvSafetyTipsView.as_view()),
-    path("api/cv/requests/<str:req_id>/complete/", CvCompleteRequestView.as_view()),
-    path("api/cv/requests/<str:req_id>/claims/", CvCreateClaimView.as_view()),
-    path("api/cv/claims/", CvMyClaimsView.as_view()),
-
 ]
-
-
-    
-

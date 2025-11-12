@@ -131,7 +131,7 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 
-SEA_LION_LLAMA_API_KEY = "sk-TSbEBjqQN9HKMcutANxL5A";  
+SEA_LION_LLAMA_API_KEY = "sk-WUJYfziO6c7TVI1XL_yDAQ";  
 SEA_LION_LLAMA_ENDPOINT = "https://api.sea-lion.ai/v1/chat/completions"
 
 

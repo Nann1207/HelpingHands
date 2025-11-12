@@ -4,3 +4,4 @@ djangorestframework-simplejwt
 faker
 django-cors-headers
 python-dotenv
+requests

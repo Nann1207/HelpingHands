@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CV · Dashboard · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Floating Chat Button -->
+<a href="/cv_chats/"
+    class="fixed right-6 bottom-6 w-14 h-14 rounded-full bg-yellow-200 border flex items-center justify-center shadow">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 10h8M8 14h5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+ </a>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/cv_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/>
+        </svg>
+        <span class="text-xl font-bold">Helping Hands (Corporate Volunteer)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/cv_claims/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">My Claims</a>
+        <a href="/cv_chats/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Messages</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">
+            Log out
+          </button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <!-- Heading -->
+    <section class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold">My Dashboard</h1>
+        <p class="text-gray-600" id="whoami">Checking session…</p>
+      </div>
+      <div class="text-sm text-gray-500 hidden" id="apiUsed"></div>
+    </section>
+
+    <!-- Pending -->
+    <section>
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Pending Requests (From CSR)</h2>
+        <div class="text-xs text-gray-500">Auto-expires when dormant</div>
+      </div>
+      <div id="pendingWrap" class="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+
+    <!-- Active -->
+    <section>
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Active Requests</h2>
+      </div>
+      <div id="activeWrap" class="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+
+    <!-- Completed -->
+    <section>
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">Completed Requests</h2>
+      </div>
+      <div id="completedWrap" class="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+
+  <script>
+    function qs(s){return document.querySelector(s)}
+    function getCSRF(){return document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1] || "";}
+    async function j(u,o={}){
+      const opts = {credentials:"include", ...o};
+      if(opts.method && opts.method.toUpperCase() !== "GET"){
+        opts.headers = { ...(opts.headers || {}), "X-CSRFToken": getCSRF() };
+      }
+      const r=await fetch(u,opts);
+      if(!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    function cardPending(item){
+      const deadline = item.offer_deadline ? new Date(item.offer_deadline).toLocaleString() : "—";
+      return `
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+        <div class="text-sm text-gray-500 mb-1">Req ${item.id} • Rank ${item.offered_rank ?? "-"}</div>
+        <div class="font-semibold">${item.service_type}</div>
+        <div class="text-sm text-gray-700 mt-1">${item.pickup_location} → ${item.service_location}</div>
+        <div class="text-sm text-gray-600">Appt: ${item.appointment_date} ${item.appointment_time?.slice(0,5) ?? ""}</div>
+        <div class="text-xs text-gray-500 mt-1">Offer deadline: ${deadline}</div>
+        <div class="mt-3 flex items-center gap-2">
+          <a href="/cv_request/${item.id}/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">View</a>
+          <button class="px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-800" data-accept="${item.id}">Accept</button>
+          <button class="px-3 py-1.5 rounded-md border hover:bg-gray-100" data-decline="${item.id}">Decline</button>
+          ${item.chat_id ? `<a href="/cv_chats/?open=${item.chat_id}" class="ml-auto text-sm text-gray-600 hover:underline">Chat</a>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function cardActive(item){
+      return `
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+        <div class="text-sm text-gray-500 mb-1">Req ${item.id}</div>
+        <div class="font-semibold">${item.service_type}</div>
+        <div class="text-sm text-gray-700 mt-1">${item.pickup_location} → ${item.service_location}</div>
+        <div class="text-sm text-gray-600">Appt: ${item.appointment_date} ${item.appointment_time?.slice(0,5) ?? ""}</div>
+        <div class="mt-3 flex items-center gap-2">
+          <a href="/cv_request/${item.id}/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Details</a>
+          <button class="px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-800" data-complete="${item.id}">Mark Complete</button>
+          ${item.chat_id ? `<a href="/cv_chats/?open=${item.chat_id}" class="ml-auto text-sm text-gray-600 hover:underline">Chat</a>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function cardCompleted(item){
+      return `
+      <div class="p-4 border border-black rounded-xl hover:shadow-xl transition-all duration-300 bg-white hover:scale-[1.02]">
+        <div class="text-sm text-gray-500 mb-1">Req ${item.id}</div>
+        <div class="font-semibold">${item.service_type}</div>
+        <div class="text-sm text-gray-700 mt-1">${item.pickup_location} → ${item.service_location}</div>
+        <div class="text-sm text-gray-600">Completed at: ${item.completed_at?.replace("T"," ").slice(0,16) ?? "—"}</div>
+        <div class="mt-3 flex items-center gap-2">
+          <a href="/cv_request/${item.id}/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">View</a>
+          <a href="/cv_claims/?newFor=${item.id}" class="px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-800">Report Claim</a>
+          ${item.chat_id ? `<a href="/cv_chats/?open=${item.chat_id}" class="ml-auto text-sm text-gray-600 hover:underline">Chat</a>` : ""}
+        </div>
+      </div>`;
+    }
+
+    async function loadWho(){
+      try{
+        const me = await j("/api/auth/me/");
+        qs("#whoami").textContent = `Logged in as ${me.username} (CV)`;
+      }catch{ location.href = "/login/?next=/cv_dashboard/"; }
+    }
+
+    async function loadData(){
+      const data = await j("/api/cv/dashboard/");
+      qs("#apiUsed").textContent = "GET /api/cv/dashboard/";
+      // render
+      const pending = data.pending || [];
+      const active = data.active || [];
+      const completed = data.completed || [];
+      qs("#pendingWrap").innerHTML   = pending.map(cardPending).join("") || `<div class="text-sm text-gray-500">No pending offers.</div>`;
+      qs("#activeWrap").innerHTML    = active.map(cardActive).join("") || `<div class="text-sm text-gray-500">No active requests.</div>`;
+      qs("#completedWrap").innerHTML = completed.map(cardCompleted).join("") || `<div class="text-sm text-gray-500">No completed requests yet.</div>`;
+
+      // wire buttons
+      document.querySelectorAll("[data-accept]").forEach(b=>{
+        b.addEventListener("click", ()=> decide(b.getAttribute("data-accept"), true));
+      });
+      document.querySelectorAll("[data-decline]").forEach(b=>{
+        b.addEventListener("click", ()=> decide(b.getAttribute("data-decline"), false));
+      });
+      document.querySelectorAll("[data-complete]").forEach(b=>{
+        b.addEventListener("click", ()=> completeReq(b.getAttribute("data-complete")));
+      });
+    }
+
+    async function decide(reqId, accepted){
+      await j(`/api/cv/requests/${reqId}/decision/`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ accepted })
+      });
+      await loadData(); // auto-remove if queue advanced/expired
+    }
+
+    async function completeReq(reqId){
+      await j(`/api/cv/requests/${reqId}/complete/`, { method:"POST" });
+      await loadData();
+    }
+
+    window.addEventListener("DOMContentLoaded", async ()=>{
+      await loadWho();
+      await loadData();
+      // optional: auto-refresh pending every 30s so dormant offers disappear
+      setInterval(()=>loadData().catch(()=>{}), 30000);
+    });
+  </script>
+</body>
+</html>
