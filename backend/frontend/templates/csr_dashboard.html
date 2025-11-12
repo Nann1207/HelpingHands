@@ -27,6 +27,11 @@
         <span class="text-xl font-bold">Helping Hands (CSR)</span>
       </a>
       <nav class="flex items-center gap-3">
+        <button id="enableDesktopAlerts"
+          class="px-3 py-1.5 rounded-md border hover:bg-gray-100"
+          type="button">
+          Enable alerts
+        </button>
         <a href="/csr_requests/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Requests</a>
         <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Shortlist</a>
         <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Match</a>
@@ -84,10 +89,19 @@
     const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
 
     async function fetchJSON(url, opts={}) {
-      const resp = await fetch(url, { credentials:"include", headers:{ "X-CSRFToken": getCSRF(), "Content-Type":"application/json" }, ...opts });
+      const baseHeaders = { "X-CSRFToken": getCSRF(), "Content-Type":"application/json" };
+      const resp = await fetch(url, {
+        cache: "no-store",
+        credentials:"include",
+        headers:{ ...baseHeaders, ...(opts.headers || {}) },
+        ...opts
+      });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       return resp.json();
     }
+
+    const DASHBOARD_REFRESH_MS = 15000; // 15s auto-refresh for dashboard + notifications
+    let dashboardTimer = null;
 
     const formatTime = (value) => {
       if (!value) return "-";
@@ -144,26 +158,181 @@
           <div>
             <div class="text-sm font-medium">${n.type.replaceAll("_"," ").toUpperCase()}</div>
             <div class="text-sm text-gray-700">${n.message}</div>
-            <div class="text-xs text-gray-500">Req: ${n.request_id ?? "-"} · CV: ${n.cv_id ?? "-"}</div>
           </div>
           <div class="text-xs text-gray-400">${new Date(n.created_at).toLocaleString()}</div>
         </li>
       `).join("");
-      qs("#apiLabel").textContent = "GET /api/csr/notifications/";
+      qs("#apiLabel").style.display = "none";
     }
 
     async function loadCSRDashboard(){
       const data = await fetchJSON("/api/csr/dashboard/");
       renderTodayActive(data.today_active || []);
       renderCommitted(data.committed || []);
-      renderNotifications(data.notifications || []);
+    }
+
+    async function loadCSRNotifications(){
+      const data = await fetchJSON("/api/csr/notifications/");
+      const items = Array.isArray(data) ? data : data.items || [];
+      renderNotifications(items);
+    }
+
+    function startDashboardAutoRefresh(){
+      if (dashboardTimer) clearInterval(dashboardTimer);
+      dashboardTimer = setInterval(() => {
+        loadCSRDashboard().catch(err => console.warn("Dashboard refresh failed:", err));
+        loadCSRNotifications().catch(err => console.warn("Notification refresh failed:", err));
+      }, DASHBOARD_REFRESH_MS);
     }
 
     // init
     window.addEventListener("DOMContentLoaded", async () => {
       await loadWhoAmI();
-      await loadCSRDashboard();
+      try {
+        await Promise.all([
+          loadCSRDashboard(),
+          loadCSRNotifications(),
+        ]);
+      } catch (err) {
+        console.warn("Initial dashboard load failed:", err);
+      }
+      startDashboardAutoRefresh();
     });
-  </script>
+
+    // ---- Desktop notifications (in-tab polling) ------------------------------
+
+    const Notifs = {
+        enabled: false,
+        lastSeenId: 0,                 // we’ll store the largest notification id we’ve shown
+        pollMs: 30000,                 // 30s
+        timer: null
+      };
+
+      // Request browser permission because it must be user-initiated
+      async function requestDesktopPermission() {
+        if (!("Notification" in window)) {
+          alert("Notifications not supported in this browser.");
+          return false;
+        }
+        // If page is served over http://localhost it works; in production use HTTPS.
+        if (Notification.permission === "granted") return true;
+        if (Notification.permission === "denied") {
+          alert("You previously blocked notifications. Please enable them in browser settings.");
+          return false;
+        }
+        const perm = await Notification.requestPermission();
+        return perm === "granted";
+      }
+
+      function showBrowserNotification({ title, body, tag, data }) {
+        try {
+          const n = new Notification(title, {
+            body,
+            tag,                 // same tag prevents stacking duplicates
+            icon: "/static/favicon.ico" // optional
+            // requireInteraction: true, // keep on screen until clicked (optional)
+          });
+          n.onclick = (evt) => {
+            window.focus();
+            // If you want to navigate to a specific page:
+            // if (data?.request_id) location.href = `/csr_match/?request=${data.request_id}`;
+            n.close();
+          };
+        } catch (e) {
+          // Fallback if notifications aren’t available (e.g., denied)
+          console.warn("Notification failed:", e);
+        }
+      }
+
+      // Fetch new CSR notifications and toast them
+      async function pollCSRNotifications() {
+        if (!Notifs.enabled) return;
+
+        try {
+          const resp = await fetch("/api/csr/notifications/", { credentials: "include", cache: "no-store" });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const items = await resp.json(); // boundary returns an array of notification rows
+          if (!Array.isArray(items)) return;
+
+          // Sort by id just in case, and emit only > lastSeenId
+          items.sort((a,b) => (a.id||0) - (b.id||0));
+          const fresh = items.filter(n => (n.id || 0) > (Notifs.lastSeenId || 0));
+
+          // If first run and you don’t want to blast history
+          // if (Notifs.lastSeenId === 0) fresh.length = 0;
+
+          for (const n of fresh) {
+            const title = ({
+              "offer_sent":      "Offer sent",
+              "offer_declined":  "CV declined",
+              "offer_expired":   "Offer expired",
+              "queue_advanced":  "Moved to next CV",
+              "match_accepted":  "Match accepted",
+              "match_filled":    "Queue filled",
+            })[n.type] || "Update";
+
+            const body = n.message || "New update.";
+            showBrowserNotification({
+              title,
+              body,
+              tag: `csr-${n.type}-${n.request_id || "none"}`,
+              data: { request_id: n.request_id, cv_id: n.cv_id }
+            });
+
+            if ((n.id || 0) > (Notifs.lastSeenId || 0)) {
+              Notifs.lastSeenId = n.id;
+            }
+          }
+        } catch (e) {
+          console.warn("Notification poll failed:", e);
+        }
+      }
+
+      function startNotificationPolling() {
+        if (Notifs.timer) clearInterval(Notifs.timer);
+        Notifs.timer = setInterval(pollCSRNotifications, Notifs.pollMs);
+        // also do an immediate poll
+        pollCSRNotifications();
+      }
+
+      // Wire up the button
+      document.addEventListener("DOMContentLoaded", () => {
+        const btn = document.getElementById("enableDesktopAlerts");
+        if (!btn) return;
+
+        // show current state
+        function refreshBtn() {
+          btn.textContent = Notifs.enabled ? "Desktop alerts ON" : "Enable alerts";
+          btn.classList.toggle("bg-gray-900", Notifs.enabled);
+          btn.classList.toggle("text-white", Notifs.enabled);
+          btn.classList.toggle("border", !Notifs.enabled);
+        }
+        refreshBtn();
+        if (Notification.permission === "granted") {
+          Notifs.enabled = true;
+          refreshBtn();
+          startNotificationPolling();
+        }
+
+        btn.addEventListener("click", async () => {
+          const ok = await requestDesktopPermission();
+          if (!ok) return;
+          Notifs.enabled = true;
+          refreshBtn();
+          startNotificationPolling();
+        });
+      });
+
+      // Optional: also poll when the tab becomes visible again
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          loadCSRDashboard().catch(err => console.warn("Dashboard refresh failed:", err));
+          loadCSRNotifications().catch(err => console.warn("Notification refresh failed:", err));
+          if (Notifs.enabled) {
+            pollCSRNotifications();
+          }
+        }
+      });
+    </script>
 </body>
 </html>

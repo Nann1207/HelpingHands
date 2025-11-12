@@ -130,3 +130,7 @@ DEFAULT_FROM_EMAIL = "Helping Hands <nirubakichor@gmail.com>"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
+
+SEA_LION_LLAMA_API_KEY = "sk-TSbEBjqQN9HKMcutANxL5A";  
+SEA_LION_LLAMA_ENDPOINT = "https://api.sealion.ai"
+

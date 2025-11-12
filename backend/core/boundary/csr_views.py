@@ -253,7 +253,8 @@ class CSRCompletedClaimsView(APIView):
 
     def get(self, request, request_id: str):
         claims = CSRCompletedController.claims(request_id)
-        return Response(ClaimReportSerializer(claims, many=True).data, status=status.HTTP_200_OK)
+        serializer = ClaimReportSerializer(claims, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class CSRClaimDecisionView(APIView):

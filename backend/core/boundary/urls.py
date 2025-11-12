@@ -10,6 +10,13 @@ from .admin_views import (
 )
 from .auth_views import auth_login, auth_me, auth_logout
 
+from core.boundary.cv_views import (
+    CvDashboardView, CvOfferDecisionView,
+    CvMyRequestsView, CvRequestDetailView,
+    CvSafetyTipsView, CvCompleteRequestView,
+    CvCreateClaimView, CvMyClaimsView,
+)
+
 # PIN
 from .pin_views import (
     PinRequestCreateView, PinMyRequestsView,
@@ -109,6 +116,16 @@ urlpatterns = [
     path("csr/completed/<str:request_id>/claims/", CSRCompletedClaimsView.as_view()),
     path("csr/claims/<str:claim_id>/decision/", CSRClaimDecisionView.as_view()),
 
+
+
+    path("api/cv/dashboard/", CvDashboardView.as_view()),
+    path("api/cv/requests/", CvMyRequestsView.as_view()),
+    path("api/cv/requests/<str:req_id>/", CvRequestDetailView.as_view()),
+    path("api/cv/requests/<str:req_id>/decision/", CvOfferDecisionView.as_view()),
+    path("api/cv/requests/<str:req_id>/safety_tips/", CvSafetyTipsView.as_view()),
+    path("api/cv/requests/<str:req_id>/complete/", CvCompleteRequestView.as_view()),
+    path("api/cv/requests/<str:req_id>/claims/", CvCreateClaimView.as_view()),
+    path("api/cv/claims/", CvMyClaimsView.as_view()),
 
 ]
 

@@ -130,6 +130,12 @@
       }
     }
 
+    function isImageUrl(url){
+      if (!url) return false;
+      const target = url.split("?")[0].toLowerCase();
+      return /\.(png|jpe?g|gif|bmp|webp|svg)$/.test(target);
+    }
+
     function badgeClass(status){
       switch (status) {
         case "verified_by_pin": return "bg-green-50 text-green-700 border-green-200";
@@ -224,6 +230,8 @@
       const description = claim.description || "";
       const category = claim.category || "";
       const payment = claim.payment_method || claim.payment || "";
+      const receiptUrl = claim.receipt_url || "";
+      const receiptIsImage = isImageUrl(receiptUrl);
 
       const actions = canDecide(status)
         ? `
@@ -259,6 +267,18 @@
               PIN ${pinVerified ? "verified this claim." : "has not verified yet."}
             </p>
           </div>
+          ${receiptUrl ? `
+            <div class="space-y-2 border-t border-dashed border-gray-200 pt-3">
+              <p class="text-sm font-medium text-gray-700">Receipt</p>
+              ${receiptIsImage ? `<img src="${receiptUrl}" alt="Receipt for claim ${claim.id}" class="max-h-56 rounded border border-gray-200 object-contain w-full bg-gray-50" loading="lazy" />` : ""}
+              <a href="${receiptUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline">
+                ${receiptIsImage ? "Open full receipt" : "Download receipt"}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
+                </svg>
+              </a>
+            </div>
+          ` : ""}
           ${actions}
         </article>
       `;

@@ -422,8 +422,9 @@ class CompletedRequestsEntity:
         Completed requests (optionally scoped by company).
         """
         return Request.objects.filter(
-            status=RequestStatus.COMPLETE
-        ).select_related("pin", "cv").order_by("-completed_at")
+            status=RequestStatus.COMPLETE,
+            claims__isnull=False,
+        ).select_related("pin", "cv").order_by("-completed_at").distinct()
 
     @staticmethod
     def claims_for_request(request_id: str) -> QuerySet:

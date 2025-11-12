@@ -118,10 +118,23 @@ class NotificationSerializer(serializers.ModelSerializer):
 class ClaimReportSerializer(serializers.ModelSerializer):
     cv = CVSerializer(read_only=True)
     request = serializers.StringRelatedField()
+    receipt_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ClaimReport
         fields = [
             "id", "category", "amount", "payment_method",
-            "description", "status", "created_at", "cv", "request"
+            "description", "status", "created_at", "cv", "request",
+            "receipt_url",
         ]
+
+    def get_receipt_url(self, obj):
+        receipt = getattr(obj, "receipt", None)
+        if not receipt:
+            return None
+        try:
+            url = receipt.url
+        except Exception:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
