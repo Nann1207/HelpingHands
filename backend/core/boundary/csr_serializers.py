@@ -56,7 +56,7 @@ class CVSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "gender", "main_language", "second_language", "service_category_preference", "company"]
 
 
-# ---------- WRITE / UPDATE OPERATIONS ----------
+# UPDATE
 
 class ShortlistCreateSerializer(serializers.ModelSerializer):
     """Used when a CSR shortlists or removes a request."""
