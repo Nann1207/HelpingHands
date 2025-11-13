@@ -19,12 +19,11 @@ logger = logging.getLogger(__name__)
 
 from core.models import Request, RequestStatus, CV, MatchQueueStatus
 from core.entity.cv_entities import CvEntity
-from core.Control.chat_controller import ChatController  # reuse
-from core.Control.csr_controller import CSRMatchController  # reuse 
+from core.Control.chat_controller import ChatController  
+from core.Control.csr_controller import CSRMatchController  
 
 class CvController:
     """
-    Business rules for Corporate Volunteers:
     - Dashboard sections (Pending offers / Active / Completed)
     - Accept / Decline offer
     - List Active/Completed requests
@@ -35,7 +34,6 @@ class CvController:
     """
 
     # ---------- guards ----------
-
     @staticmethod
     def _ensure_is_cv(user) -> CV:
         if not hasattr(user, "cv"):
@@ -134,19 +132,29 @@ class CvController:
         endpoint = getattr(settings, "SEA_LION_LLAMA_ENDPOINT", "https://api.sea-lion.ai/v1/chat/completions")
         model = getattr(settings, "SEA_LION_LLAMA_MODEL", "aisingapore/Gemma-SEA-LION-v4-27B-IT")
 
-        # Try remote if configured; fallback to rules if not or on failure
+        
         if api_key and requests:
             try:
+                advisor_prompt = (
+                    "You provide safety tips for volunteer escorts who accompany persons-in-need to healthcare or community appointments.\n"
+                    "Use the JSON payload to tailor 5-6 concise, practical tips that reflect the person's age, gender preference, service category, and appointment details.\n"
+                    "Refer to the assisted individual as the person-in-need (PIN) at all times; never use rider, client, or patient labels.\n"
+                    "Focus on on-site support and personal safety; do not mention driving or vehicle operations.\n"
+                    "Service categories:\n"
+                    "- Healthcare Escort: General medical consultations (GP visits, outpatient check-ups, hospital follow-ups).\n"
+                    "- Therapy Escort: Physiotherapy, occupational therapy, counseling, or mental health sessions.\n"
+                    "- Dialysis Escort: Recurring hemo/peritoneal dialysis appointments.\n"
+                    "- Vaccination / Check-up: Short visits for vaccinations, tests, or screenings.\n"
+                    "- Mobility Assistance: Wheelchair navigation, transfers, or wayfinding for persons with reduced mobility.\n"
+                    "- Community Event: Social, cultural, or community activities such as support groups or library visits.\n"
+                    "Return ONLY a JSON array (no prose) where each entry is a short safety tip string."
+                )
                 payload = {
                     "model": model,
                     "messages": [
                         {
                             "role": "advisor",
-                            "content": (
-                                "You are providing safety tips for volunteer medical escorts in their shift for helping elderly/disabled people to bring them to their appointments."
-                                "These medical escorts will have to pick up the patient and accompany them to their appointment and then drop them home."
-                                "Return ONLY a JSON array (no text) of 5-6 concise safety tips."
-                            ),
+                            "content": advisor_prompt,
                         },
                         {
                             "role": "user",
@@ -237,9 +245,9 @@ class CvController:
     @staticmethod
     def _fallback_tips(*, req, age, pin):
         tips = [
-            "Verify the rider's identity at pickup and confirm the appointment details.",
+            "Verify the person-in-need's identity at pickup and confirm the appointment details.",
             "Keep communication inside the Helping Hands channels; avoid sharing personal numbers.",
-            "Share your live status with the platform if travelling to an unfamiliar location.",
+            "Share your live status with your loved ones if travelling to an unfamiliar location.",
         ]
         service = (req.service_type or "").lower()
         if service.startswith("vaccination") or "medical" in service:
@@ -247,9 +255,9 @@ class CvController:
         if service.startswith("legal") or "court" in service:
             tips.append("Plan extra time for security checkpoints and document checks.")
         if age and age >= 65:
-            tips.append("Allow additional time for mobility support and ensure safe entry/exit of vehicles.")
+            tips.append("Allow additional time for mobility support and ensure safe entry/exit when assisting the person-in-need.")
         if pin and getattr(pin, "preferred_cv_gender", "") == "female":
-            tips.append("Prioritize well-lit, public meeting points when possible.")
+            tips.append("Prioritize well-lit, public meeting points for the person-in-need when possible.")
         return tips
 
 

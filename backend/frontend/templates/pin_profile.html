@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Profile · Helping Hands</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Prevent cached/bfcache after logout/back -->
+  <!-- Prevent after logout/back -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -70,12 +70,7 @@
 </main>
 
 <script>
-  /* ============================================================
-     ASYNC DOM HELPER — Presentation utility (NOT a Boundary)
-     ------------------------------------------------------------
-     Role: Presentation (view helper). No server I/O.
-     Pattern: await $id("name")
-  ============================================================ */
+
   async function $id(id){
     const now = document.getElementById(id);
     if (now) return now;
@@ -91,22 +86,16 @@
     throw new Error(`Element with id="${id}" not found`);
   }
 
-  /* ============================================================
-     COOKIE / CSRF — Presentation utility (NOT a Boundary)
-     ------------------------------------------------------------
-     Role: Presentation helper used by Boundary functions.
-  ============================================================ */
+
   function getCookie(name) {
     const v = `; ${document.cookie}`; const p = v.split(`; ${name}=`);
     if (p.length === 2) return p.pop().split(';').shift();
   }
   const csrftoken = getCookie('csrftoken');
 
-  /* ============================================================
-     ERROR MESSAGE PICKER — Presentation utility (NOT a Boundary)
-     ------------------------------------------------------------
-     Role: Formats server error payload for user feedback.
-  ============================================================ */
+  /* ====================
+     ERROR MESSAGE  
+     -------------------- */
   function pickErrorMessage(payload, fallback){
     if (!payload || typeof payload !== "object") return fallback;
     if (typeof payload.detail === "string") return payload.detail;
@@ -128,25 +117,18 @@
     return fallback;
   }
 
-  /* ============================================================
-     fetchJSON — ASYNC BOUNDARY (GET)
-     ------------------------------------------------------------
-     BCE Role: Boundary (talks to backend)
-     Use: const me = await fetchJSON("/api/auth/me/");
-  ============================================================ */
+  /* ========================
+     fetchJSON — BOUNDARY
+     --------------------------*/
   async function fetchJSON(url){
     const r = await fetch(url, { credentials:"include" });
     if (!r.ok) throw new Error("HTTP "+r.status);
     return r.json();
   }
 
-  /* ============================================================
-     postJSON — ASYNC BOUNDARY (POST)
-     ------------------------------------------------------------
-     BCE Role: Boundary (talks to backend)
-     Use: const {ok,data} = await postJSON("/api/...", body)
-     Notes: Adds CSRF + JSON headers, returns {ok,status,data}
-  ============================================================ */
+  /* ==================================
+     postJSON —  BOUNDARY 
+     ----------------------- */
   async function postJSON(url, body){
     try{
       const resp = await fetch(url, {
@@ -163,17 +145,9 @@
     }
   }
 
-  /* ============================================================
-     PAGE MODULE (async IIFE) — Controller + Presentation
-     ------------------------------------------------------------
-     - Controller: wires events, calls Boundary, updates UI
-     - Presentation: writes textContent / classes
-  ============================================================ */
+
   (async () => {
-    /* ---------------------------------------------
-       prefill() — Controller uses Boundary (GET)
-       BCE: Calls fetchJSON (Boundary) to hydrate UI.
-    --------------------------------------------- */
+
     async function prefill(){
       try{
         const me = await fetchJSON("/api/auth/me/"); // Boundary
@@ -183,15 +157,13 @@
         if (me.preferred_cv_gender)   (await $id("prefGender")).value = me.preferred_cv_gender;
         if (me.preferred_cv_language) (await $id("prefLang")).value   = me.preferred_cv_language;
       }catch{
-        // Non-fatal: stay silent if endpoint not available
+       
       }
     }
 
-    /* --------------------------------------------------------------
-       sendOtp() — Controller invoking Boundary (POST)
-       BCE: postJSON("/api/pin/profile/otp/start/", {})
-       UI: writes #msg
-    -------------------------------------------------------------- */
+    /* ----------------------------
+       Boundary for Profile OTP
+    -------------------------------- */
     window.sendOtp = async function sendOtp(){
       try{
         const r = await postJSON("/api/pin/profile/otp/start/", {}); // Boundary
@@ -206,11 +178,9 @@
       }catch{/* swallow */}
     };
 
-    /* ----------------------------------------------------------------
-       Save Profile — Controller invoking Boundary (POST)
-       BCE: postJSON("/api/pin/profile/otp/confirm/", { code, fields })
-       UI: shows success/error in #msg
-    ---------------------------------------------------------------- */
+    /* ----------
+    Boundary for Save profile OTP
+    ------------ */
     (await $id("saveProfile")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const code = (await $id("otpCode")).value.trim();
@@ -233,9 +203,8 @@
     });
 
     /* --------------------------------------------------------------
-       Send Password OTP — Controller invoking Boundary (POST)
+       BOUNDARY FOR OTP SEND FOR PASSWORD CHANGE
        BCE: postJSON("/api/pin/password/otp/start/", {})
-       UI: writes #pwdMsg
     -------------------------------------------------------------- */
     (await $id("sendPwdOtp")).addEventListener("click", async (ev) => {
       ev.preventDefault();
@@ -251,9 +220,8 @@
     });
 
     /* --------------------------------------------------------------
-       Change Password — Controller invoking Boundary (POST)
-       BCE: postJSON("/api/pin/password/change/", { code, new_password })
-       UI: writes #pwdMsg
+        BOUNDARY FOR PASSWORD CHANGE
+        BCE: postJSON("/api/pin/password/change/", { code, new_password })
     -------------------------------------------------------------- */
     (await $id("changePwd")).addEventListener("click", async (ev) => {
       ev.preventDefault();
@@ -270,7 +238,7 @@
       }
     });
 
-    // Controller: initial 
+    
     await prefill();
   })();
 </script>
