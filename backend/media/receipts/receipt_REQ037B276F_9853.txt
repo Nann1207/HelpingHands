@@ -1,0 +1,3 @@
+Receipt for request REQ037B276F
+Amount: $78.22
+Paid via paynow

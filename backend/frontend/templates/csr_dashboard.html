@@ -199,22 +199,22 @@
       startDashboardAutoRefresh();
     });
 
-    // ---- Desktop notifications (in-tab polling) ------------------------------
+   
 
     const Notifs = {
         enabled: false,
-        lastSeenId: 0,                 // we’ll store the largest notification id we’ve shown
-        pollMs: 30000,                 // 30s
+        lastSeenId: 0,                 
+        pollMs: 30000,                
         timer: null
       };
 
-      // Request browser permission because it must be user-initiated
+      // Request browser permission 
       async function requestDesktopPermission() {
         if (!("Notification" in window)) {
           alert("Notifications not supported in this browser.");
           return false;
         }
-        // If page is served over http://localhost it works; in production use HTTPS.
+        
         if (Notification.permission === "granted") return true;
         if (Notification.permission === "denied") {
           alert("You previously blocked notifications. Please enable them in browser settings.");
@@ -228,23 +228,22 @@
         try {
           const n = new Notification(title, {
             body,
-            tag,                 // same tag prevents stacking duplicates
-            icon: "/static/favicon.ico" // optional
-            // requireInteraction: true, // keep on screen until clicked (optional)
+            tag,                
+            icon: "/static/favicon.ico" 
+           
           });
           n.onclick = (evt) => {
             window.focus();
-            // If you want to navigate to a specific page:
-            // if (data?.request_id) location.href = `/csr_match/?request=${data.request_id}`;
+            
             n.close();
           };
         } catch (e) {
-          // Fallback if notifications aren’t available (e.g., denied)
+         
           console.warn("Notification failed:", e);
         }
       }
 
-      // Fetch new CSR notifications and toast them
+     
       async function pollCSRNotifications() {
         if (!Notifs.enabled) return;
 
@@ -254,13 +253,11 @@
           const items = await resp.json(); // boundary returns an array of notification rows
           if (!Array.isArray(items)) return;
 
-          // Sort by id just in case, and emit only > lastSeenId
+         
           items.sort((a,b) => (a.id||0) - (b.id||0));
           const fresh = items.filter(n => (n.id || 0) > (Notifs.lastSeenId || 0));
 
-          // If first run and you don’t want to blast history
-          // if (Notifs.lastSeenId === 0) fresh.length = 0;
-
+         
           for (const n of fresh) {
             const title = ({
               "offer_sent":      "Offer sent",
@@ -291,16 +288,16 @@
       function startNotificationPolling() {
         if (Notifs.timer) clearInterval(Notifs.timer);
         Notifs.timer = setInterval(pollCSRNotifications, Notifs.pollMs);
-        // also do an immediate poll
+
         pollCSRNotifications();
       }
 
-      // Wire up the button
+
       document.addEventListener("DOMContentLoaded", () => {
         const btn = document.getElementById("enableDesktopAlerts");
         if (!btn) return;
 
-        // show current state
+
         function refreshBtn() {
           btn.textContent = Notifs.enabled ? "Desktop alerts ON" : "Enable alerts";
           btn.classList.toggle("bg-gray-900", Notifs.enabled);
@@ -323,7 +320,7 @@
         });
       });
 
-      // Optional: also poll when the tab becomes visible again
+
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
           loadCSRDashboard().catch(err => console.warn("Dashboard refresh failed:", err));

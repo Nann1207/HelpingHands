@@ -1,0 +1,3 @@
+Receipt for request REQF80F7CB5
+Amount: $7.31
+Paid via paynow

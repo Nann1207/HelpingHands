@@ -1,0 +1,3 @@
+Receipt for request REQ7E248EAD
+Amount: $54.67
+Paid via paynow

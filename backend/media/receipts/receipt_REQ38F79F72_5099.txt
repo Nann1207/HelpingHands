@@ -1,0 +1,3 @@
+Receipt for request REQ38F79F72
+Amount: $31.72
+Paid via paynow

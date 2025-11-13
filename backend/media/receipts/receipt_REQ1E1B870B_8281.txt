@@ -1,0 +1,3 @@
+Receipt for request REQ1E1B870B
+Amount: $31.57
+Paid via card

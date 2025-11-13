@@ -1,9 +1,4 @@
-"""
-CONTROL: Flagging helpers used by moderation/CSR/PA.
-- Create auto/manual flags.
-- Simple lookups per-request.
-Note: resolving flags is in admin_services.resolve_flag (PA action).
-"""
+
 
 from __future__ import annotations
 from typing import Optional

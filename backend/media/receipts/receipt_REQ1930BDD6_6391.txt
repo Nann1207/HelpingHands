@@ -1,0 +1,3 @@
+Receipt for request REQ1930BDD6
+Amount: $52.38
+Paid via cash

@@ -1,0 +1,3 @@
+Receipt for request REQ9CD45BA9
+Amount: $21.77
+Paid via paynow

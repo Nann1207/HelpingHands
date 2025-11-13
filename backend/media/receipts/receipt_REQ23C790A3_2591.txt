@@ -1,0 +1,3 @@
+Receipt for request REQ23C790A3
+Amount: $53.34
+Paid via paynow

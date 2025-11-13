@@ -32,8 +32,7 @@ class DashboardEntity:
             status=RequestStatus.ACTIVE,
             appointment_date=today,
         ).select_related("pin", "cv")
-        # If CSR should only see his company’s CV-assigned requests, filter by CV.company
-        # return qs.filter(cv__company=csr.company) if needed
+        
         return qs
 
     @staticmethod
@@ -151,7 +150,7 @@ class MatchEntity:
     @staticmethod
     def _score_cv_for_request(req: Request, cv: CV) -> Tuple[float, Dict[str, Any]]:
         """
-        Compute a simple match score using category + preferences (gender/language).
+        This is to compute a simple match score using category + preferences (gender/language).
         Expand as needed (distance, historical performance, etc.).
         """
         score = 0.0
@@ -161,6 +160,7 @@ class MatchEntity:
         if cv.service_category_preference == req.service_type:
             score += 3.0
             reasons["category"] = True
+
 
         # PIN preferences
         pin: PersonInNeed = req.pin
@@ -174,7 +174,7 @@ class MatchEntity:
             score += 1.0
             reasons["language_second"] = True
 
-        # Sooner appointments = prioritise available CVs (placeholder +1)
+        
         score += 1.0
 
         return score, reasons
@@ -257,7 +257,7 @@ class MatchEntity:
         mq.deadline = mq.sent_at + timezone.timedelta(minutes=timeout_minutes)
         mq.save(update_fields=["status", "sent_at", "deadline"])
 
-        # Notify CSR user (recipient = CSRRep.user) and optionally the CV (if your app supports it)
+        # Notify CSR user  and optionally the CV 
         Notification.objects.create(
             recipient=req.committed_by_csr.user,  # CSR account user
             type=NotificationType.OFFER_SENT,
@@ -356,7 +356,7 @@ class MatchProgressEntity:
                 message=f"No match found from queue for {req.id}.",
                 request=req,
             )
-            # Optionally: revert request to COMMITTED (still in CSR pool)
+            
             req.status = RequestStatus.COMMITTED
             req.cv = None
             req.save(update_fields=["status", "cv", "updated_at"])

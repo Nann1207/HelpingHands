@@ -1,0 +1,3 @@
+Receipt for request REQBC7C7BFA
+Amount: $62.5
+Paid via paynow

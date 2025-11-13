@@ -1,0 +1,3 @@
+Receipt for request REQ1C678789
+Amount: $68.29
+Paid via paylah

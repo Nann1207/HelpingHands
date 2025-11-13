@@ -1,0 +1,3 @@
+Receipt for request REQ77413DAE
+Amount: $24.16
+Paid via paynow

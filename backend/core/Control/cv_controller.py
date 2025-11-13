@@ -29,7 +29,7 @@ class CvController:
     - List Active/Completed requests
     - Request details (click-through)
     - Complete a request (delegates to ChatController)
-    - Safety tips (Sea Lion Llama API with graceful fallback)
+    - Safety tips (Sea Lion Llama API with  fallback)
     - Submit & list claims
     """
 
@@ -206,8 +206,7 @@ class CvController:
         cv = CvController._ensure_is_cv(user)
         return CvEntity.list_my_claims(cv_id=cv.id)
 
-    # ---------- helpers ----------
-
+    # helper
     @staticmethod
     def _parse_llm_tips(payload):
         if not isinstance(payload, dict):

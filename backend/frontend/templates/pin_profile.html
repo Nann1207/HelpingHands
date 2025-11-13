@@ -202,10 +202,8 @@
       }
     });
 
-    /* --------------------------------------------------------------
-       BOUNDARY FOR OTP SEND FOR PASSWORD CHANGE
-       BCE: postJSON("/api/pin/password/otp/start/", {})
-    -------------------------------------------------------------- */
+    /* 
+       BOUNDARY FOR OTP SEND FOR PASSWORD CHANGE*/
     (await $id("sendPwdOtp")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const r = await postJSON("/api/pin/password/otp/start/", {}); // Boundary (adjust if needed)
@@ -220,8 +218,7 @@
     });
 
     /* 
-        BOUNDARY FOR PASSWORD CHANGE
-        BCE: postJSON("/api/pin/password/change/", { code, new_password }) */
+        BOUNDARY FOR PASSWORD CHANGE */
     (await $id("changePwd")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const code = (await $id("pwdOtp")).value.trim();

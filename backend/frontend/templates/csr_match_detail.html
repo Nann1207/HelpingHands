@@ -113,11 +113,13 @@
       `;
     }
 
+    
     // ---------- API calls ----------
     async function loadSuggestions(requestId){
       const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/suggest/`);
       renderSuggestions(data.suggestions || []);
     }
+
 
     async function setAssignmentPool(requestId, cvIds){
       const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/assignment/`, {
@@ -137,7 +139,7 @@
         method:"POST",
         body: JSON.stringify({ timeout_minutes: timeoutMinutes })
       });
-      // After sending offers, refresh queue display (deadline etc.)
+      // After sending offers, refresh queue display
       renderQueue(data);
     }
 
@@ -176,7 +178,7 @@
         try {
           await loadAssignmentPool(reqId);
         } catch (_) {
-          // ignore transient failures
+        
         }
       }, 15000);
     }

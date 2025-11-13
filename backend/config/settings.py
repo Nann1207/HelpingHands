@@ -130,8 +130,10 @@ DEFAULT_FROM_EMAIL = "Helping Hands <nirubakichor@gmail.com>"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
+LOGIN_URL = "/login/"
+LOGOUT_REDIRECT_URL = "/login/"
+
 
 SEA_LION_LLAMA_API_KEY = "sk-WUJYfziO6c7TVI1XL_yDAQ";  
 SEA_LION_LLAMA_ENDPOINT = "https://api.sea-lion.ai/v1/chat/completions"
-
 

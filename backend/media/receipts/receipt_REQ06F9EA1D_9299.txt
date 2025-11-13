@@ -1,0 +1,3 @@
+Receipt for request REQ06F9EA1D
+Amount: $36.35
+Paid via card

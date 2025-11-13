@@ -1,0 +1,3 @@
+Receipt for request REQAC49D1EA
+Amount: $61.02
+Paid via paynow

@@ -1,0 +1,3 @@
+Receipt for request REQEEE0DFF6
+Amount: $29.9
+Paid via card

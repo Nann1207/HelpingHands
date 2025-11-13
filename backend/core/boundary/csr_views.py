@@ -200,6 +200,8 @@ class CSRCommitListView(APIView):
 
 # ---- 5) Match Details --------------------------------------------------------
 
+
+#THIS IS THE API
 class CSRMatchSuggestView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
@@ -209,15 +211,19 @@ class CSRMatchSuggestView(APIView):
         return Response({"suggestions": suggestions}, status=status.HTTP_200_OK)
 
 
+
+
 class CSRMatchAssignmentPoolView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
     class _Payload(serializers.Serializer):
         cv_ids = serializers.ListField(child=serializers.CharField(), min_length=1, max_length=3)
 
+
     def get(self, request, request_id: str):
         data = CSRMatchController.get_assignment_pool(request_id)
         return Response(data, status=status.HTTP_200_OK)
+
 
     def post(self, request, request_id: str):
         payload = self._Payload(data=request.data)
@@ -286,10 +292,6 @@ class CSRCompletedClaimsView(APIView):
 
         serializer = ClaimReportSerializer(claims, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
-
 
 
 

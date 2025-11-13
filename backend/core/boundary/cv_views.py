@@ -11,7 +11,7 @@ from .cv_serializers import (
     ClaimCreateSerializer, ClaimReportSerializer
 )
 
-# ---------- Dashboard: three sections ----------
+#  Dashboard: three sections 
 
 class CvDashboardView(APIView):
     # GET /api/cv/dashboard/
@@ -28,7 +28,7 @@ class CvDashboardView(APIView):
         }
         return Response(payload, status=200)
 
-# ---------- Pending: decision endpoints ----------
+#  Pending: decision endpoints----------
 
 class CvOfferDecisionView(APIView):
     # POST /api/cv/requests/<req_id>/decision/   { "accepted": true|false }
@@ -42,7 +42,7 @@ class CvOfferDecisionView(APIView):
             return Response({"detail": str(e)}, status=400)
         return Response(result, status=200)
 
-# ---------- Lists ----------
+#  Lists 
 
 class CvMyRequestsView(APIView):
     # GET /api/cv/requests/?status=active|complete
@@ -54,7 +54,7 @@ class CvMyRequestsView(APIView):
             return Response({"detail": str(e)}, status=400)
         return Response(CvRequestListSerializer(qs, many=True).data, status=200)
 
-# ---------- Detail ----------
+#  Detail 
 
 class CvRequestDetailView(APIView):
     # GET /api/cv/requests/<req_id>/
@@ -65,7 +65,7 @@ class CvRequestDetailView(APIView):
             return Response({"detail": str(e)}, status=403)
         return Response(CvRequestDetailSerializer(req_obj).data, status=200)
 
-# ---------- Safety Tips ----------
+#  Safety Tips 
 
 class CvSafetyTipsView(APIView):
     # GET /api/cv/requests/<req_id>/safety_tips/
@@ -76,7 +76,7 @@ class CvSafetyTipsView(APIView):
             return Response({"detail": str(e)}, status=403)
         return Response(data, status=200)
 
-# ---------- Complete ----------
+#  Complete 
 
 class CvCompleteRequestView(APIView):
     # POST /api/cv/requests/<req_id>/complete/
@@ -87,7 +87,7 @@ class CvCompleteRequestView(APIView):
             return Response({"detail": str(e)}, status=403)
         return Response({"request_id": req.id, "status": req.status, "completed_at": req.completed_at}, status=200)
 
-# ---------- Claims ----------
+#  Claims 
 
 class CvCreateClaimView(APIView):
     # POST /api/cv/requests/<req_id>/claims/

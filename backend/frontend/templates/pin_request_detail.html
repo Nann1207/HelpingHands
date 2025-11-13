@@ -15,7 +15,7 @@
     });
   </script>
   <style>
-    .kv .k { color:#6b7280 }  /* text-gray-500 */
+    .kv .k { color:#6b7280 }  
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
@@ -128,7 +128,7 @@
       return r.ok;
     }
 
-    /** Boundary: POST dispute claim with reason/comment */
+    /* Boundary: POST dispute claim with reason/comment */
     async function disputeClaim(claimId, reason, comment){
       const r = await fetch(`/api/pin/claims/${encodeURIComponent(claimId)}/dispute/`, {
         method: "POST",
@@ -150,17 +150,15 @@
     function safe(val, fallback="—"){
       return (val !== undefined && val !== null) ? val : fallback;
     }
-    /** Entity helper: title-case + underscore to space */
+
     function titleCase(s){ return (s||"").replace(/_/g," ").replace(/\b\w/g, m => m.toUpperCase()); }
-    /** Entity helper: detect typical image URLs for inline preview */
+
     function looksLikeImage(url){ return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url||""); }
 
-    /* ========== BOUNDARY =========== */
+    /* ========== THEEE BOUNDARY =========== */
 
-    /** Boundary-UI: render the Request entity summary card */
     async function renderRequest(r){
-      // Entity fields used: id, service_type, created_at, appointment_date, appointment_time,
-      // pickup_location, service_location, shortlist_count, status, description
+ 
       const created  = (r.created_at||"").slice(0,10);
       const apptDate = r.appointment_date || "";
       const apptTime = (r.appointment_time||"").slice(0,5);
@@ -181,10 +179,9 @@
       (await $id("card")).innerHTML = html;
     }
 
-    /** Boundary-UI: render the Claim entity details +  receipt preview */
+   
     async function renderClaim(cl){
-      // Entity fields used: id, category, expense_date, amount, payment_method,
-      // description, status, receipt_url/receipt
+
       const body        = await $id("claimBody");
       const badge       = await $id("claimStatusBadge");
       const receiptWrap = await $id("receiptWrap");
@@ -207,11 +204,11 @@
       const url = cl.receipt_url || cl.receipt || null;
 
       if (url){
-        // Always give a button to open in new tab
+
         receiptBtn.href = url;
         receiptBtn.classList.remove("hidden");
 
-        // Show inline preview only for image-like URLs
+
         if (looksLikeImage(url)){
           receiptWrap.classList.remove("hidden");
           receiptLink.href = url;
@@ -234,35 +231,35 @@
       async function load(){
         const reqId = getReqIdFromPath();
 
-        // Boundary (GET): fetch PIN requests by status
+        // fetch PIN requests by status
         const complete = await fetchJSON(`/api/pin/my/requests/?status=complete`);
         const active   = await fetchJSON(`/api/pin/my/requests/?status=active`);
         const pending  = await fetchJSON(`/api/pin/my/requests/?status=pending`);
 
-        // Entity: select the matching Request entity from the aggregated lists
+        // 
         const req = [...complete, ...active, ...pending].find(x => x.id === reqId);
 
         const card = await $id("card");
         if (!req){
-          // Boundary-UI: render not-found message
+         
           card.innerHTML = `<div class="text-red-600">Request not found.</div>`;
           return;
         }
 
-        // Boundary-UI: render request summary
+        
         await renderRequest(req);
 
-        // Control → Boundary (GET): check if an open chat exists for this request
+        
         try{
           const chats = await fetchJSON(`/api/me/chats/?status=open`);
           const has = (chats||[]).some(c => (c.request_id === reqId || c.request === reqId) && c.is_open);
           if (has) (await $id("openChat")).classList.remove("hidden");
         }catch{ /* ignore transient chat API errors */ }
 
-        // Control: Claims section only for completed requests
+        
         if (req.status !== "complete") return;
 
-        // Boundary (GET): fetch all claims for PIN, then Entity-filter by this request
+        //  fetch all claims for PIN then filter to this request
         const claimsAll = await fetchJSON(`/api/pin/claims/`);
         const myClaims = (claimsAll || []).filter(c => (c.request_id === reqId || c.request === reqId));
 
@@ -281,14 +278,14 @@
           return;
         }
 
-        // Entity: choose most recent claim for this request
+       
         myClaims.sort((a,b) => (a.created_at||"") < (b.created_at||"") ? 1 : -1);
         const cl = myClaims[0];
 
-        // Boundary-UI: render claim details
+        
         await renderClaim(cl);
 
-        // Control: lock actions if claim is finalized
+       
         const lockedStatuses = ["verified_by_pin","disputed_by_pin","reimbursed_by_csr","rejected_by_csr"];
         const locked = lockedStatuses.includes((cl.status||"").toLowerCase());
         if (locked){
@@ -305,7 +302,7 @@
           if (ok){
             msg.textContent = "Claim verified.";
             msg.className = "text-sm text-green-700";
-            await load(); // re-flow after success
+            await load(); 
           } else {
             msg.textContent = "Failed to verify claim.";
             msg.className = "text-sm text-red-700";
@@ -313,7 +310,7 @@
         });
 
         (await $id("btnDispute")).addEventListener("click", () => {
-          form.classList.remove("hidden"); // Boundary-UI toggle only
+          form.classList.remove("hidden"); 
         });
 
         (await $id("submitDispute")).addEventListener("click", async () => {
@@ -332,7 +329,7 @@
           if (ok){
             msg.textContent = "Dispute submitted.";
             msg.className = "text-sm text-green-700";
-            await load(); // re-flow after success
+            await load(); 
           } else {
             msg.textContent = "Failed to submit dispute.";
             msg.className = "text-sm text-red-700";

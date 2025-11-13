@@ -1,0 +1,3 @@
+Receipt for request REQ700F8C27
+Amount: $47.37
+Paid via paynow

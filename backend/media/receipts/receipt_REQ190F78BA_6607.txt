@@ -1,0 +1,3 @@
+Receipt for request REQ190F78BA
+Amount: $58.84
+Paid via paynow

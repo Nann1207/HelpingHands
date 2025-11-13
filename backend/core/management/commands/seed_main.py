@@ -174,7 +174,7 @@ class Command(BaseCommand):
         for i in range(num_pins):
             u = User.objects.create_user(
                 username=f"pin{i+1}",
-                email=f"pin{i+1}@example.com",
+                email=f"avaataraangbison@gmail.com",
                 password="Test1234!",
             )
             p = PersonInNeed.objects.create(

@@ -1,0 +1,3 @@
+Receipt for request REQ0ECA776C
+Amount: $10.43
+Paid via cash

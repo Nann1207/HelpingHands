@@ -253,15 +253,18 @@ class CSRMatchController:
             }
         return CSRMatchController._serialize_queue(mq)
 
+
     @staticmethod
     def send_offers(request_id: str, timeout_minutes: int = 30) -> Dict[str, Any]:
         mq = MatchEntity.send_offers(request_id, timeout_minutes)
         return CSRMatchController._serialize_queue(mq)
 
+
     @staticmethod
     def cv_decision(request_id: str, cv_id: str, accepted: bool) -> Dict[str, Any]:
         req = MatchProgressEntity.record_cv_decision(request_id, cv_id, accepted)
         return {"request_id": req.id, "status": req.status, "cv": req.cv_id}
+
 
     @staticmethod
     def sweep_dormant() -> Dict[str, Any]:

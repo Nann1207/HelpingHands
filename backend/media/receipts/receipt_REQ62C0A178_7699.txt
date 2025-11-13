@@ -1,0 +1,3 @@
+Receipt for request REQ62C0A178
+Amount: $30.03
+Paid via paynow
