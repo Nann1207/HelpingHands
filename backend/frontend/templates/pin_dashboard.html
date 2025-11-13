@@ -132,6 +132,7 @@
       }
 
 
+
       function rowHtml(r) {
         const created  = (r.created_at || "").slice(0, 10);       // "YYYY-MM-DD"
         const apptDate = (r.appointment_date || "");              // as-is
@@ -158,21 +159,27 @@
       async function load(status) {
         setActiveTab(status); // Presentation
 
+
         // Simple loading row
         rows.innerHTML =
           `<tr><td class="px-3 py-4 text-gray-500" colspan="9">Loading…</td></tr>`;
 
+
         // Boundary: fetch request list for the given status
         const data = await fetchJSON(`/api/pin/my/requests/?status=${encodeURIComponent(status)}`);
+
+
 
         // render rows if empty
         rows.innerHTML =
           (data || []).map(rowHtml).join("") ||
           `<tr><td class="px-3 py-4 text-gray-500" colspan="9">No requests.</td></tr>`;
 
+
         // Presentation: status line
         statusLine.textContent = `Loaded ${data?.length || 0} ${status} requests`;
 
+        
         
         document.querySelectorAll("tbody#rows tr[data-id]").forEach(tr => {
           tr.addEventListener("click", () => {

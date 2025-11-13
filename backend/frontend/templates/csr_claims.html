@@ -131,6 +131,7 @@
     }
 
 
+     //
     function isImageUrl(url){
       if (!url) return false;
       const target = url.split("?")[0].toLowerCase();
@@ -138,6 +139,7 @@
     }
 
 
+    // This function returns the CSS classes for a status badge
     function badgeClass(status){
       switch (status) {
         case "verified_by_pin": return "bg-green-50 text-green-700 border-green-200";
@@ -148,6 +150,7 @@
       }
     }
 
+    // This renders the rows in the completed requests table
     function renderRequestRows(){
       const body = qs("[data-table='requests']");
       if (!state.requests.length) {
@@ -172,6 +175,8 @@
       }).join("");
     }
 
+
+    // boundary function to load completed requests
     async function loadCompletedRequests(){
       const body = qs("[data-table='requests']");
       body.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">Loading…</td></tr>';
@@ -190,6 +195,7 @@
       renderRequestRows();
     }
 
+    // This resets the claims panel to its initial state
     function resetClaimsPanel(message = "Pick a completed request to see reimbursement claims."){
       qs("[data-selected-label]").textContent = "No request selected.";
       const btn = qs("[data-action='refresh-claims']");
@@ -199,6 +205,7 @@
       qs("[data-claims-container]").innerHTML = `<div class="text-sm text-gray-500">${message}</div>`;
     }
 
+    // This updates the label above the claims panel
     function updateSelectedLabel(requestId){
       const req = state.requests.find(r => r.id === requestId);
       const label = req
@@ -219,10 +226,12 @@
       }
     }
 
+    // Determine if CSR can make a decision on this claim
     function canDecide(status){
       return status !== "reimbursed_by_csr" && status !== "rejected_by_csr";
     }
 
+    // This is the template for a single claim card
     function claimCard(claim){
       const status = claim.status || "submitted";
       const pinVerified = claim.verified_by_pin ?? status === "verified_by_pin";
@@ -237,6 +246,7 @@
       const receiptIsImage = isImageUrl(receiptUrl);
 
 
+      // This section builds the action buttons or status message
       const actions = canDecide(status)
         ? `
             <div class="flex flex-wrap gap-2">
@@ -288,6 +298,7 @@
       `;
     }
 
+    // boundary function to load claims for a request
     async function loadClaims(requestId){
       if (!requestId) {
         resetClaimsPanel();
@@ -311,6 +322,8 @@
       }
     }
 
+
+    // boundary function to submit claim decision
     async function submitClaimDecision(claimId, action){
       try {
         await fetchJSON(`/api/csr/claims/${encodeURIComponent(claimId)}/decision/`, {
@@ -324,6 +337,7 @@
       }
     }
 
+    // It is formed to handle button clicks in the page
     document.addEventListener("click", async (event) => {
       const button = event.target.closest("button[data-action]");
       if (!button) return;

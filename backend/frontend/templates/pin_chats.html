@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  
   <title>Messages · Helping Hands</title>
+
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- Prevent cached/bfcache after logout/back -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -69,9 +71,9 @@
       if (p.length === 2) return p.pop().split(';').shift();
     }
 
-    /* =====================================================================
+    /* ==============================
      * BOUNDARY FUNCTION: j(u, o)
-     * ===================================================================== */
+     * ============================== */
     async function j(u,o){
       const r = await fetch(u,{ credentials:"include", ...(o||{}) });
       if(!r.ok){
