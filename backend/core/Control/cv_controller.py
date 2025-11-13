@@ -64,7 +64,6 @@ class CvController:
         return {"pending": pending, "active": active, "completed": completed}
 
     # ---------- lists & detail ----------
-
     @staticmethod
     def list_requests(*, user, status: str):
         cv = CvController._ensure_is_cv(user)
@@ -83,7 +82,7 @@ class CvController:
         return req
 
     # ---------- offer decisions ----------
-
+    
     @staticmethod
     def decide_offer(*, user, req_id: str, accepted: bool):
         cv = CvController._ensure_is_cv(user)
@@ -142,10 +141,11 @@ class CvController:
                     "model": model,
                     "messages": [
                         {
-                            "role": "system",
+                            "role": "advisor",
                             "content": (
-                                "You are a safety coach for a volunteer transport platform. "
-                                "Return ONLY a JSON array (no text) of 3-6 concise safety tips."
+                                "You are providing safety tips for volunteer medical escorts in their shift for helping elderly/disabled people to bring them to their appointments."
+                                "These medical escorts will have to pick up the patient and accompany them to their appointment and then drop them home."
+                                "Return ONLY a JSON array (no text) of 5-6 concise safety tips."
                             ),
                         },
                         {

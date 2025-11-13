@@ -228,6 +228,7 @@ class MatchEntity:
             mq.save()
         return mq
 
+
     @staticmethod
     def get_assignment_pool(request_id: str) -> Optional[MatchQueue]:
         try:
@@ -281,6 +282,7 @@ class MatchProgressEntity:
         """
         CV accepts or declines. On accept → match; on decline → advance.
         """
+        
         req = Request.objects.select_for_update().get(pk=request_id)
         mq = MatchQueue.objects.select_for_update().get(request=req)
 

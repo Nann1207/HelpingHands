@@ -96,12 +96,14 @@ class ClaimDecisionSerializer(serializers.Serializer):
 class CSRDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
+
     def get(self, request):
         data = CSRDashboardController.get_dashboard(_csr(request))
         return Response(DashboardResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
 # ---- 2) Requests Pool --------------------------------------------------------
+
 
 class CSRRequestPoolView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
