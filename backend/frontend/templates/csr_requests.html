@@ -39,7 +39,7 @@
     <section class="p-4 rounded-xl bg-white border">
       <h2 class="font-semibold mb-2">Appointment Dates Coming Soon</h2>
       <table class="table">
-        <thead><tr><th>ID</th><th>Category</th><th>Date</th><th>Location</th><th>Shortlists</th><th></th></tr></thead>
+        <thead><tr><th>ID</th><th>Category</th><th>Date</th><th>Location</th><th>Shortlists</th><th>Details</th><th></th></tr></thead>
         <tbody data-table="comingSoon"></tbody>
       </table>
     </section>
@@ -47,7 +47,7 @@
     <section class="p-4 rounded-xl bg-white border">
       <h2 class="font-semibold mb-2">All Requests</h2>
       <table class="table">
-        <thead><tr><th>ID</th><th>Category</th><th>Date</th><th>Location</th><th>Shortlists</th><th></th></tr></thead>
+        <thead><tr><th>ID</th><th>Category</th><th>Date</th><th>Location</th><th>Shortlists</th><th>Details</th><th></th></tr></thead>
         <tbody data-table="allRequests"></tbody>
       </table>
     </section>
@@ -65,6 +65,7 @@
     }
 
     function rowHTML(r){
+      const detailUrl = `/csr_request/${encodeURIComponent(r.id)}/`;
       return `
         <tr class="hover:bg-gray-50">
           <td class="font-mono">${r.id}</td>
@@ -72,6 +73,7 @@
           <td>${r.appointment_date}</td>
           <td>${r.location}</td>
           <td>${r.shortlist_count ?? 0}</td>
+          <td><a class="text-sm font-medium text-blue-600 hover:underline" href="${detailUrl}">View</a></td>
           <td class="space-x-2">
             <button class="px-2 py-1 border rounded-md" data-action="shortlist" data-id="${r.id}">Shortlist</button>
             <button class="px-2 py-1 bg-gray-900 text-white rounded-md" data-action="commit" data-id="${r.id}">Commit</button>

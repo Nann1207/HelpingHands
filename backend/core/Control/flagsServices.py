@@ -18,11 +18,12 @@ def auto_flag_request(*, req: Request, reason: str = "") -> FlaggedRequest:
     """
     Called by your moderation pipeline when something looks unsafe.
     """
+    clean_reason = (reason or "").strip() or "Auto moderation flagged this request."
     return FlaggedRequest.objects.create(
         request=req,
         flag_type=FlagType.AUTO,
         csr=None,
-        reason=reason or "Auto moderation flagged this request.",
+        reasonbycsr=clean_reason,
     )
 
 
@@ -31,11 +32,12 @@ def manual_flag_request(*, req: Request, csr: CSRRep, reason: str) -> FlaggedReq
     """
     CSR manually flags a request they see as inappropriate or needing review.
     """
+    clean_reason = (reason or "").strip() or "CSR manually flagged this request."
     return FlaggedRequest.objects.create(
         request=req,
         flag_type=FlagType.MANUAL,
         csr=csr,
-        reason=reason,
+        reasonbycsr=clean_reason,
     )
 
 

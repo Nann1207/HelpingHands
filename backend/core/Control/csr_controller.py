@@ -13,6 +13,7 @@ from core.entity.csr_entity import (
     DashboardEntity, RequestEntity, ShortlistEntity, CommitEntity,
     MatchEntity, MatchProgressEntity, NotificationEntity, CompletedRequestsEntity,
 )
+from core.Control.flagsServices import manual_flag_request
 
 
 class CSRDashboardController:
@@ -114,6 +115,46 @@ class CSRRequestController:
         # Once committed, remove from this CSR's shortlist so UI updates cleanly
         RequestEntity.remove_shortlist(csr, request_id)
         return {"id": req.id, "status": req.status}
+
+    @staticmethod
+    def retrieve(request_id: str) -> Dict[str, Any]:
+        req = RequestEntity.get(request_id)
+        pin = req.pin
+        cv = req.cv
+        appointment_date = req.appointment_date.isoformat() if req.appointment_date else ""
+        appointment_time = req.appointment_time.strftime("%H:%M") if req.appointment_time else ""
+        return {
+            "id": req.id,
+            "status": req.status,
+            "service_type": req.service_type,
+            "category": req.service_type,
+            "appointment_date": appointment_date,
+            "appointment_time": appointment_time,
+            "pickup_location": req.pickup_location,
+            "service_location": req.service_location,
+            "description": req.description,
+            "pin_id": pin.id if pin else None,
+            "pin_name": pin.name if pin else None,
+            "pin_gender_pref": getattr(pin, "preferred_cv_gender", None),
+            "pin_lang_pref": getattr(pin, "preferred_cv_language", None),
+            "cv_id": cv.id if cv else None,
+            "cv_name": cv.name if cv else None,
+            "notes": None,
+            "status_notes": None,
+        }
+
+    @staticmethod
+    def flag_request(csr: CSRRep, request_id: str, reason: str = "") -> Dict[str, Any]:
+        req = RequestEntity.get(request_id)
+        reason_text = (reason or "").strip()
+        flag = manual_flag_request(req=req, csr=csr, reason=reason_text)
+        req.refresh_from_db(fields=["status"])
+        return {
+            "flagged": True,
+            "flag_id": flag.id,
+            "request_id": req.id,
+            "status": req.status,
+        }
 
 
 class CSRShortlistController:

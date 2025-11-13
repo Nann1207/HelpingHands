@@ -25,7 +25,7 @@ from .pin_views import (
 )
 
 from .csr_views import ( 
-    CSRDashboardView, CSRRequestPoolView, CSRShortlistToggleView,
+    CSRDashboardView, CSRRequestPoolView, CSRRequestDetailView, CSRRequestFlagView, CSRShortlistToggleView,
     CSRCommitFromPoolView, CSRShortlistView, CSRCommitListView,
     CSRMatchSuggestView, CSRMatchAssignmentPoolView, CSRSendOffersView,
     CVCandidateDecisionView, DormantSweepView,
@@ -97,6 +97,8 @@ urlpatterns = [
 
     path("csr/dashboard/", CSRDashboardView.as_view()),
     path("csr/requests/", CSRRequestPoolView.as_view()),
+    path("csr/requests/<str:request_id>/", CSRRequestDetailView.as_view()),
+    path("csr/requests/<str:request_id>/flag/", CSRRequestFlagView.as_view()),
     path("csr/requests/<str:request_id>/shortlist/", CSRShortlistToggleView.as_view()),
     path("csr/requests/<str:request_id>/commit/", CSRCommitFromPoolView.as_view()),
 

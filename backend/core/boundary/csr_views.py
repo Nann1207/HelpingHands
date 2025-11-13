@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, serializers
 
-from core.models import CSRRep, RequestStatus
+from core.models import CSRRep, RequestStatus, Request
 
 from core.Control.csr_controller import (
     CSRDashboardController, CSRRequestController, CSRShortlistController,
@@ -18,6 +18,7 @@ from core.Control.csr_controller import (
 )
 from core.boundary.csr_serializers import (
     RequestListSerializer,
+    RequestDetailSerializer,
     NotificationSerializer,
     ClaimReportSerializer,
     CVSuggestionSerializer,
@@ -91,6 +92,10 @@ class ClaimDecisionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=["reimburse", "reject"])
 
 
+class CSRFlagSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
 # ---- 1) Dashboard ------------------------------------------------------------
 
 class CSRDashboardView(APIView):
@@ -111,6 +116,29 @@ class CSRRequestPoolView(APIView):
     def get(self, request):
         data = CSRRequestController.list_pool()
         return Response(ComingSoonResponseSerializer(data).data, status=status.HTTP_200_OK)
+
+
+class CSRRequestDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def get(self, request, request_id: str):
+        try:
+            data = CSRRequestController.retrieve(request_id)
+        except Request.DoesNotExist:
+            return Response({"detail": "Request not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = RequestDetailSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CSRRequestFlagView(APIView):
+    permission_classes = [IsAuthenticated, IsCSRRep]
+
+    def post(self, request, request_id: str):
+        serializer = CSRFlagSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        reason = serializer.validated_data.get("reason") or ""
+        data = CSRRequestController.flag_request(_csr(request), request_id, reason)
+        return Response(data, status=status.HTTP_201_CREATED)
 
 
 class CSRShortlistToggleView(APIView):

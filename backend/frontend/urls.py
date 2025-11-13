@@ -17,6 +17,7 @@ urlpatterns = [
     # --- Corporate Social Responsibility Rep (CSR) ---
     path("csr_dashboard/", pages.csr_dashboard_page, name="csr_dashboard_page"),
     path("csr_requests/", pages.csr_requests_page, name="csr_requests_page"),
+    path("csr_request/<str:req_id>/", pages.csr_request_detail_page, name="csr_request_detail_page"),
     path("csr_shortlist/", pages.csr_shortlist_page, name="csr_shortlist_page"),
     path("csr_match/", pages.csr_match_page, name="csr_match_page"),
     path("csr_claims/", pages.csr_claims_page, name="csr_claims_page"),
@@ -28,4 +29,3 @@ urlpatterns = [
     path("cv_claims/", pages.cv_claims_page, name="cv_claims_page"),
     path("cv_chats/", pages.cv_chats_page, name="cv_chats_page"),
 ]
-

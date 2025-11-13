@@ -54,6 +54,10 @@ class DashboardEntity:
 
 class RequestEntity:
     @staticmethod
+    def get(request_id: str) -> Request:
+        return Request.objects.select_related("pin", "cv", "committed_by_csr").get(pk=request_id)
+
+    @staticmethod
     def available_requests() -> QuerySet:
         """
         Pool shown on Request Page (PENDING only).

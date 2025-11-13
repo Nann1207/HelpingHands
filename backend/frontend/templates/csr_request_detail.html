@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSR · Request Detail · Helping Hands</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .status-pill{display:inline-flex;align-items:center;border-radius:9999px;font-size:.75rem;font-weight:600;padding:.15rem .85rem;border-width:1px;border-style:solid}
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/csr_dashboard/" class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21S4 13.748 4 9A5 5 0 0 1 14 7a5 5 0 1 1 6 2c0 4.748-8 12-8 12z"/></svg>
+        <span class="text-xl font-bold">Helping Hands (CSR)</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a href="/csr_requests/" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Requests</a>
+        <a href="/csr_shortlist/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Shortlist</a>
+        <a href="/csr_match/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Match</a>
+        <a href="/csr_claims/" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Claims</a>
+        <form method="post" action="/api/auth/logout/" class="inline-block m-0 p-0">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600">Log out</button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main id="root" data-reqid="{{ req_id }}" class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <a href="/csr_requests/" class="text-sm text-blue-600 hover:underline">← Back to Request Pool</a>
+      <div class="ml-auto flex items-center gap-2">
+        <span class="text-xs uppercase tracking-wide text-gray-500">Request ID</span>
+        <span id="req-id" class="font-mono text-lg">—</span>
+      </div>
+      <span id="status-pill" class="status-pill border-gray-300 bg-gray-100 text-gray-700">Loading</span>
+    </div>
+
+    <div id="alerts" class="hidden"></div>
+
+    <section class="grid gap-6 lg:grid-cols-3">
+      <div class="lg:col-span-2 space-y-6">
+        <article class="p-5 rounded-xl border bg-white">
+          <header class="flex flex-wrap items-center gap-3">
+            <div>
+              <p class="text-xs uppercase text-gray-500">Service Category</p>
+              <p id="service" class="text-xl font-semibold">—</p>
+            </div>
+
+          </header>
+          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-gray-500">Person in Need</p>
+              <p id="pin-name" class="font-medium text-gray-900">—</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Assigned CV</p>
+              <p id="cv" class="font-medium text-gray-900">—</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Appointment Date</p>
+              <p id="appt-date" class="font-medium text-gray-900">—</p>
+            </div>
+            <div>
+              <p class="text-gray-500">Appointment Time</p>
+              <p id="appt-time" class="font-medium text-gray-900">—</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="p-5 rounded-xl border bg-white">
+          <h2 class="text-lg font-semibold">Request Details</h2>
+          <dl class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt class="text-gray-500">Pickup Location</dt>
+              <dd id="pickup" class="font-medium text-gray-900">—</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Service Location</dt>
+              <dd id="dropoff" class="font-medium text-gray-900">—</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Route</dt>
+              <dd id="route" class="font-medium text-gray-900">—</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Status Notes</dt>
+              <dd id="status-notes" class="font-medium text-gray-900">—</dd>
+            </div>
+          </dl>
+          <div id="pin-notes" class="mt-4 hidden">
+            <p class="text-gray-500 text-sm">PIN Notes</p>
+            <p id="notes" class="mt-1 rounded-lg bg-gray-50 p-3 text-sm text-gray-900"></p>
+          </div>
+        </article>
+      </div>
+
+      <aside class="space-y-6">
+        <section class="p-5 rounded-xl border bg-white space-y-4">
+          <div>
+            <h2 class="text-lg font-semibold">Commit to Match</h2>
+            <p class="text-sm text-gray-600">Send this request to the matching queue when details look good.</p>
+          </div>
+          <button id="btn-commit" class="w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">Commit to Match</button>
+          <p id="match-status" class="text-xs text-gray-500"></p>
+        </section>
+
+        <section class="p-5 rounded-xl border bg-white space-y-3">
+          <div>
+            <h2 class="text-lg font-semibold">Moderation Flag</h2>
+            <p class="text-sm text-gray-600">Alert program admins if anything looks incorrect or unsafe.</p>
+          </div>
+          <label for="flag-reason" class="text-xs font-semibold text-gray-500">Reason (optional)</label>
+          <textarea id="flag-reason" rows="4" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="Describe the issue…"></textarea>
+          <button id="btn-flag" class="w-full rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Submit Flag</button>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      const $ = (sel, scope=document) => scope.querySelector(sel);
+      const root = document.getElementById("root");
+      const REQ_ID = root?.dataset.reqid;
+
+      function getCookie(name){
+        const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return m ? decodeURIComponent(m[2]) : null;
+      }
+      const csrftoken = getCookie('csrftoken') || '';
+
+      const statusColors = {
+        "PENDING": "border-amber-200 bg-amber-50 text-amber-800",
+        "COMMITTED": "border-emerald-200 bg-emerald-50 text-emerald-800",
+        "REVIEW": "border-red-200 bg-red-50 text-red-800",
+        "MATCHING": "border-blue-200 bg-blue-50 text-blue-800",
+      };
+
+      function setStatus(status){
+        const pill = $("#status-pill");
+        const key = String(status || "").toUpperCase();
+        const cls = statusColors[key] || "border-gray-300 bg-gray-100 text-gray-700";
+        pill.className = `status-pill ${cls}`;
+        pill.textContent = status || "Unknown";
+      }
+
+      function showAlert(message, kind="info"){
+        const box = $("#alerts");
+        if(!box) return;
+        const colors = {
+          success: "border-green-200 bg-green-50 text-green-900",
+          error: "border-red-200 bg-red-50 text-red-900",
+          info: "border-blue-200 bg-blue-50 text-blue-900",
+        };
+        box.classList.remove("hidden");
+        box.innerHTML = `<div class="rounded-lg border px-4 py-2 text-sm ${colors[kind] || colors.info}">${message}</div>`;
+      }
+
+      async function getJSON(url){
+        const res = await fetch(url, { credentials: "include" });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
+
+      async function postJSON(url, body){
+        const res = await fetch(url, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: JSON.stringify(body || {}),
+        });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
+
+      function setText(sel, value, fallback='—'){
+        const el = $(sel);
+        if(el){ el.textContent = value || fallback; }
+      }
+
+      function render(data){
+        setText('#req-id', data.id);
+        setText('#service', data.service_type);
+        
+        setText('#pin-name', data.pin_name || data.pin || '—');
+        setText('#cv', data.cv_name ? `${data.cv_name}${data.cv_id ? ` (${data.cv_id})` : ''}` : (data.cv_id || 'Unassigned'));
+        setText('#appt-date', data.appointment_date || '—');
+        setText('#appt-time', data.appointment_time || '—');
+        setText('#pickup', data.pickup_location || '—');
+        setText('#dropoff', data.service_location || '—');
+        setText('#route', `${data.pickup_location || '—'} → ${data.service_location || '—'}`);
+        setText('#status-notes', data.status_notes || data.description || '—');
+
+        const notesWrap = document.getElementById('pin-notes');
+        if(notesWrap){
+          if(data.notes){
+            notesWrap.classList.remove('hidden');
+            setText('#notes', data.notes);
+          }else{
+            notesWrap.classList.add('hidden');
+            setText('#notes', '');
+          }
+        }
+
+        setStatus(data.status);
+        updateCommitState(data.status);
+      }
+
+      function updateCommitState(status){
+        const btn = document.getElementById('btn-commit');
+        const hint = document.getElementById('match-status');
+        const committed = String(status || '').toUpperCase() === 'COMMITTED';
+        if(btn){
+          btn.disabled = committed;
+          btn.textContent = committed ? 'Committed' : 'Commit to Match';
+        }
+        if(hint){
+          hint.textContent = committed ? 'This request is already moving through the matching queue.' : 'Not yet committed to matching.';
+        }
+      }
+
+      async function load(){
+        if(!REQ_ID) return;
+        const data = await getJSON(`/api/csr/requests/${encodeURIComponent(REQ_ID)}/`);
+        render(data);
+      }
+
+      document.getElementById('btn-commit')?.addEventListener('click', async () => {
+        try{
+          await postJSON(`/api/csr/requests/${encodeURIComponent(REQ_ID)}/commit/`, {});
+          showAlert('Request committed to matching.', 'success');
+          await load();
+        }catch(err){
+          console.error(err);
+          showAlert('Unable to commit request right now.', 'error');
+        }
+      });
+
+      document.getElementById('btn-flag')?.addEventListener('click', async () => {
+        const reason = (document.getElementById('flag-reason')?.value || '').trim();
+        try{
+          await postJSON(`/api/csr/requests/${encodeURIComponent(REQ_ID)}/flag/`, { reason });
+          showAlert('Flag submitted for PA review. Request moved back to moderation.', 'success');
+          await load();
+        }catch(err){
+          console.error(err);
+          showAlert('Failed to submit flag.', 'error');
+        }
+      });
+
+      load().catch(err => {
+        console.error(err);
+        showAlert('Unable to load request details.', 'error');
+      });
+    })();
+  </script>
+</body>
+</html>

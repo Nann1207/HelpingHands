@@ -32,6 +32,7 @@ class RequestListSerializer(serializers.Serializer):
     appointment_time = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     pickup_location = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     service_location = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    location = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     shortlist_count = serializers.IntegerField(required=False, default=0)
     pin = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -44,7 +45,18 @@ class RequestListSerializer(serializers.Serializer):
         if data.get("shortlist_count") is None:
             data["shortlist_count"] = 0
         return data
-    
+
+
+class RequestDetailSerializer(RequestListSerializer):
+    pin_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pin_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pin_gender_pref = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pin_lang_pref = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    cv_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    cv_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    status_notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
 
 
 
