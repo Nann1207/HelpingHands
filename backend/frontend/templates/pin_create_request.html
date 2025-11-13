@@ -91,7 +91,7 @@
       throw new Error(`Element with id="${id}" not found`);
     }
 
-    /* ================= UI cookie helper (not Boundary) ================ */
+    /* ================= UI cookie helper================ */
     function getCookie(name){
       const v = `; ${document.cookie}`;
       const p = v.split(`; ${name}=`);
@@ -118,7 +118,7 @@
     }
 
     /* ==============================================================
-       PAGE CONTROLLER (IIFE): wires UI → Boundary calls
+       PAGE CONTROLLER: wires UI → Boundary calls
        --------------------------------------------------------------
        - Cancel button: UI navigation (not Boundary)
        - Submit handler: validates + Boundary POST to create request
