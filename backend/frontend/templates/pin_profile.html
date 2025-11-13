@@ -219,10 +219,9 @@
       }
     });
 
-    /* --------------------------------------------------------------
+    /* 
         BOUNDARY FOR PASSWORD CHANGE
-        BCE: postJSON("/api/pin/password/change/", { code, new_password })
-    -------------------------------------------------------------- */
+        BCE: postJSON("/api/pin/password/change/", { code, new_password }) */
     (await $id("changePwd")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const code = (await $id("pwdOtp")).value.trim();

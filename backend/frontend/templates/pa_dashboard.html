@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* lock chart panel height; let canvas flex within */
+    /* to lock chart panel height */
     #requestsChartWrap { height: 22rem; } /* ~ h-88 */
     #requestsChart { width: 100% !important; height: 100% !important; }
     code.api { font-size: 0.75rem; padding: 0.15rem 0.35rem; background: #f3f4f6; border-radius: 0.25rem; }
@@ -141,7 +141,7 @@
   </main>
 
   <script>
-    // ----------------------------- Helpers (UI/utility — not Boundary)
+    // UI
     function qs(sel){ return document.querySelector(sel); }
     function buildQuery(params){
       const pairs = Object.entries(params).filter(([_,v]) => v !== undefined && v !== null && v !== "");
@@ -159,27 +159,14 @@
 
     let requestsChart;
 
-    /* ==============================================================
-       ASYNC BOUNDARY FUNCTION: fetchJSON(url)
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       WHY: Performs HTTP GET to backend API with credentials,
-            parses JSON, throws on HTTP error. This function is the
-            frontend ↔ backend gateway in this page.
-    ============================================================== */
+    /*ASYNC BOUNDARY FUNCTION: fetchJSON(url) */
     async function fetchJSON(url){
       const resp = await fetch(url, { credentials: "include" });
       if (!resp.ok) throw new Error("HTTP "+resp.status);
       return resp.json();
     }
 
-    /* ==============================================================
-       ASYNC BOUNDARY FUNCTION: loadWhoAmI()
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       WHY: Verifies session by calling /api/auth/me/. On failure,
-            redirects to login. On success, updates #whoami.
-    ============================================================== */
+    /* ASYNC BOUNDARY FUNCTION: loadWhoAmI()*/
     async function loadWhoAmI(){
       try{
         const me = await fetchJSON("/api/auth/me/"); // Boundary call
@@ -189,7 +176,7 @@
       }
     }
 
-    // ----------------------------- Pure UI helpers (not Boundary)
+    // UI Helpers
     function updateApiLabel(fullUrl){
       try{
         const u = new URL(fullUrl, window.location.origin);
@@ -198,6 +185,7 @@
         qs("#apiCall").textContent = fullUrl;
       }
     }
+
 
     function buildExportLink(){
       const query = buildQuery({ from: fromInput.value, to: toInput.value });
@@ -211,7 +199,7 @@
     }
 
     function mapCardsToUI(cards){
-      // Human-friendly labels coming from controller/service
+     
       qs("#kpiPins").textContent          = cards["Number of PIN"] ?? "0";
       qs("#kpiCVs").textContent           = cards["Number of CV"] ?? "0";
       qs("#kpiCSRs").textContent          = cards["Number of CSR"] ?? "0";
@@ -225,14 +213,7 @@
       qs("#reqComplete").textContent = cards["Completed"] ?? "0";
     }
 
-    /* ==============================================================
-       ASYNC BOUNDARY FUNCTION: loadMetrics()
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       WHY: Builds query → GET /api/admin/metrics/ → updates UI and
-            chart. Reads server state; does not mutate.
-       ENDPOINT: GET /api/admin/metrics/?from=...&to=...&granularity=...
-    ============================================================== */
+    /* ASYNC BOUNDARY FUNCTION: loadMetrics() */
     async function loadMetrics(){
       const params = {
         granularity: granSel.value || "day",
@@ -294,12 +275,7 @@
       buildExportLink();
     }
 
-    /* ==============================================================
-       CONTROLLER: resetFilters()
-       --------------------------------------------------------------
-       BCE ROLE: Control
-       WHY: Resets UI inputs, then triggers Boundary (loadMetrics).
-    ============================================================== */
+    /* Resets UI inputs, then triggers Boundary (loadMetrics)= */
     function resetFilters(){
       fromInput.value = "";
       toInput.value   = "";
@@ -307,18 +283,11 @@
       loadMetrics(); // Boundary
     }
 
-    // Wire UI → Control/Boundary
+    // Wire UI 
     applyBtn.addEventListener("click", loadMetrics); // Boundary
     resetBtn.addEventListener("click", resetFilters);
 
-    /* ==============================================================
-       INIT (Controller glue that triggers Boundaries on load)
-       --------------------------------------------------------------
-       On DOMContentLoaded:
-       - Verify session (Boundary)
-       - Build export link (UI)
-       - Load metrics (Boundary)
-    ============================================================== */
+
     window.addEventListener("DOMContentLoaded", async () => {
       await loadWhoAmI();  // Boundary
       buildExportLink();   // UI

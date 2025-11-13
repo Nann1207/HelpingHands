@@ -98,16 +98,9 @@
       if (p.length === 2) return p.pop().split(';').shift();
     }
 
-    /* ==============================================================
-       ASYNC BOUNDARY FUNCTION: j(url, opts)
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       PURPOSE: Single gateway for backend HTTP calls (fetch→JSON)
-                with credentials, surfaces server errors.
-       USAGE:
-         - GET   await j("/api/…")
-         - POST  await j("/api/…", { method:"POST", headers:{…}, body: JSON.stringify(data) })
-    ============================================================== */
+    /* ============
+        BOUNDARY FUNCTION: j(url, opts)
+       ------------ */
     async function j(url,opts){
       const r = await fetch(url,{ credentials:"include", ...(opts||{}) });
       if(!r.ok){
@@ -118,11 +111,8 @@
     }
 
     /* ==============================================================
-       PAGE CONTROLLER: wires UI → Boundary calls
-       --------------------------------------------------------------
-       - Cancel button: UI navigation (not Boundary)
-       - Submit handler: validates + Boundary POST to create request
-    ============================================================== */
+       PAGE CONTROLLER: wires UI to the Boundary calls
+      ========================================= */
     (async () => {
       const form      = await $id("f");
       const note      = await $id("note");
@@ -131,13 +121,7 @@
       // UI only — not a Boundary
       cancelBtn.addEventListener("click", ()=> location.href="/pin_dashboard/");
 
-      /* ------------------------------------------------------------
-         CONTROLLER: form submit → ASYNC BOUNDARY POST
-         BCE ROLE: Control (handler) that invokes Boundary (j POST)
-         ENDPOINT: POST /api/pin/requests/
-         BODY:     { service_type, appointment_date, appointment_time,
-                     pickup_location, service_location, description }
-      ------------------------------------------------------------ */
+
       form.addEventListener("submit", async (e)=>{
         e.preventDefault();
         const fd = new FormData(form);

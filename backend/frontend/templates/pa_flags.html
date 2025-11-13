@@ -150,25 +150,16 @@
     fromInput.value = fmtDate(daysAgo(30));
     toInput.value   = fmtDate(new Date());
 
-    /* ==============================================================
+    /* ===============================
        ASYNC BOUNDARY FUNCTION: fetchJSON(url)
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       PURPOSE: Generic GET helper to call backend with credentials,
-                parse JSON, and surface HTTP errors. Single gateway
-                for reads.
-    ============================================================== */
+    =================================== */
     async function fetchJSON(url){
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) throw new Error("HTTP "+r.status);
       return r.json();
     }
 
-    /* ==============================================================
-       UI (Entity/Presentation): open/close modal helpers
-       --------------------------------------------------------------
-       Not Boundaries: No server I/O, only DOM manipulation.
-    ============================================================== */
+    /* UI  */
     function openModal(flag){
       activeFlagId = flag.id;
       modalFlagId.textContent = flag.id;
@@ -184,14 +175,9 @@
       activeFlagId = null;
     }
 
-    /* ==============================================================
+    /* ==================================
        ASYNC BOUNDARY FUNCTION: load()
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       PURPOSE: Builds query params → GET /api/admin/flags/
-                → renders table + wires row actions.
-       ENDPOINT: /api/admin/flags/?resolved=...&flag_type=...&from=...&to=...
-    ============================================================== */
+    ====================================== */
     async function load(){
       const params = new URLSearchParams();
       if (resolvedSel.value) params.set("resolved", resolvedSel.value);
@@ -234,7 +220,7 @@
 
       statusLine.textContent = `Loaded ${data?.length || 0} flags`;
 
-      // Wire each "Edit" to open modal (Control glue; no I/O)
+      // Wire each "Edit" to open modal 
       document.querySelectorAll("button.edit").forEach(btn => {
         btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-id");
@@ -247,14 +233,6 @@
 
     /* ==============================================================
        ASYNC BOUNDARY FUNCTION: submitDecision()
-       --------------------------------------------------------------
-       BCE ROLE: Boundary
-       PURPOSE: Sends the PA's resolution to the server
-                (Accept → /accept/, Reject → /reject/), then reloads.
-       ENDPOINTS:
-         POST /api/admin/flags/:id/accept/
-         POST /api/admin/flags/:id/reject/
-       BODY: { resolution_notes }
     ============================================================== */
     async function submitDecision(){
       if (!activeFlagId) return;

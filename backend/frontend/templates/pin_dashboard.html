@@ -82,15 +82,7 @@
   </a>
 
   <script>
-    /**
-     * ============================================================
-     * ASYNC DOM LOOKUP: $id(id)
-     * ------------------------------------------------------------
-     * BCE ROLE: Presentation (UI helper) — NOT a Boundary.
-     * WHY: Robustly resolves an element by id using async pattern,
-     *      matching your "await DOM helper" style.
-     * ============================================================
-     */
+  
     async function $id(id) {
       const now = document.getElementById(id);
       if (now) return now;
@@ -108,44 +100,26 @@
       throw new Error(`Element with id="${id}" not found`);
     }
 
-    /**
-     * ============================================================
-     * PAGE MODULE (async IIFE)
-     * ------------------------------------------------------------
-     * Acts as the Controller layer: wires UI events to Boundary
-     * functions and updates the Presentation (DOM).
-     * ============================================================
-     */
+
     (async () => {
-      // ---------- PRESENTATION: acquire DOM refs via async helper ----------
+  
       const rows       = await $id("rows");        // <tbody id="rows">
       const statusLine = await $id("statusLine");  // <p id="statusLine">
-      // Tab buttons are UI-only; keeping querySelectorAll as-is.
+      // Tab buttons
       const tabs = document.querySelectorAll(".tab");
 
-      // ---------- CONTROLLER STATE ----------
+     
+
       let current = "pending"; // default tab
 
-      /**
-       * ==========================================================
-       * ASYNC BOUNDARY: fetchJSON(url)
-       * ----------------------------------------------------------
-       * BCE ROLE: Boundary
-       * PURPOSE: Single HTTP GET gateway to backend (credentials
-       *          included). Throws on non-2xx.
-       * NOTE: Centralizing network I/O makes Boundary explicit.
-       * ==========================================================
-       */
+
       async function fetchJSON(url) {
         const r = await fetch(url, { credentials: "include" });
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       }
 
-      /**
-       * ---------- PRESENTATION: tab styles ----------
-       * Not a Boundary; pure visual state.
-       */
+
       function setActiveTab(name) {
         current = name;
         tabs.forEach(t => {
@@ -157,10 +131,7 @@
         });
       }
 
-      /**
-       * ---------- PRESENTATION: row template ----------
-       * Not a Boundary; formats server data for the UI.
-       */
+
       function rowHtml(r) {
         const created  = (r.created_at || "").slice(0, 10);       // "YYYY-MM-DD"
         const apptDate = (r.appointment_date || "");              // as-is
@@ -180,30 +151,21 @@
       }
 
       /**
-       * ==========================================================
-       * ASYNC BOUNDARY + CONTROLLER: load(status)
-       * ----------------------------------------------------------
-       * BCE ROLE:
-       *   - Boundary: performs GET /api/pin/my/requests/?status=…
-       *   - Controller: updates UI based on response, wires clicks.
-       * FLOW:
-       *   1) setActiveTab (Presentation)
-       *   2) fetchJSON(...)  <-- Boundary call
-       *   3) render table / empty state (Presentation)
-       *   4) wire row click handlers (Controller → navigation)
-       * ==========================================================
+       * ===========
+       * BOUNDARY 
+       * -----------
        */
       async function load(status) {
         setActiveTab(status); // Presentation
 
-        // Simple loading row (Presentation)
+        // Simple loading row
         rows.innerHTML =
           `<tr><td class="px-3 py-4 text-gray-500" colspan="9">Loading…</td></tr>`;
 
         // Boundary: fetch request list for the given status
         const data = await fetchJSON(`/api/pin/my/requests/?status=${encodeURIComponent(status)}`);
 
-        // Presentation: render rows / empty state
+        // render rows if empty
         rows.innerHTML =
           (data || []).map(rowHtml).join("") ||
           `<tr><td class="px-3 py-4 text-gray-500" colspan="9">No requests.</td></tr>`;
@@ -211,7 +173,7 @@
         // Presentation: status line
         statusLine.textContent = `Loaded ${data?.length || 0} ${status} requests`;
 
-        // Controller: row click → navigate to detail (UI routing)
+        
         document.querySelectorAll("tbody#rows tr[data-id]").forEach(tr => {
           tr.addEventListener("click", () => {
             const id = tr.getAttribute("data-id");
@@ -220,10 +182,10 @@
         });
       }
 
-      // ---------- CONTROLLER: tab click handlers ----------
+      
       tabs.forEach(t => t.addEventListener("click", () => load(t.dataset.tab)));
 
-      // ---------- CONTROLLER: initial load (defaults to "pending") ----------
+      
       await load(current);
     })();
   </script>

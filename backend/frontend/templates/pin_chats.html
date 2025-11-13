@@ -45,14 +45,7 @@
   </main>
 
   <script>
-    /* ============================================================
-     * ASYNC DOM QUERY HELPER (UI/Presentation — NOT Boundary)
-     * ------------------------------------------------------------
-     * Usage: const el = await $qs("#id-or-selector")
-     * - Resolves immediately if element exists.
-     * - Otherwise waits for DOMContentLoaded / next frame then tries again.
-     * - Throws a clear error if still not found.
-     * ============================================================ */
+
     async function $qs(selector){
       let el = document.querySelector(selector);
       if (el) return el;
@@ -77,15 +70,7 @@
     }
 
     /* =====================================================================
-     * ASYNC BOUNDARY FUNCTION: j(u, o)
-     * ---------------------------------------------------------------------
-     * BCE ROLE: Boundary
-     * WHY: Generic fetch → JSON gateway with credentials and error surfacing.
-     *      All backend I/O on this page routes through here.
-     * CONTRACT:
-     *   - GET:  j("/api/…")
-     *   - POST: j("/api/…", { method:"POST", headers:{...}, body: JSON.stringify({...}) })
-     * ERROR: throws Error(message) if response !ok
+     * BOUNDARY FUNCTION: j(u, o)
      * ===================================================================== */
     async function j(u,o){
       const r = await fetch(u,{ credentials:"include", ...(o||{}) });
@@ -98,11 +83,11 @@
       return r.json();
     }
 
-    /* =================== Page logic inside async IIFE ===================
-     * IIFE acts as CONTROLLER glue (wires UI to Boundary calls).
-     * =================================================================== */
+    /*
+        wires UI to Boundary calls
+     * ============================ */
     (async () => {
-      // Acquire DOM refs via awaited async helper (requested pattern)
+
       const chatList   = await $qs("#chatList");
       const messages   = await $qs("#messages");
       const sendForm   = await $qs("#sendForm");
@@ -111,7 +96,7 @@
 
       let activeChatId = null;
 
-      // ---------------- UI renderer (Presentation — NOT Boundary)
+      //  UI Presentation
       function li(c){
         const open = c.is_open
           ? `<span class="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">Open</span>`
@@ -123,14 +108,7 @@
       }
 
       /* ===============================================================
-       * ASYNC BOUNDARY FUNCTION: loadChats()
-       * ---------------------------------------------------------------
-       * BCE ROLE: Boundary
-       * WHY: Reads user’s chats from server, then renders list (UI).
-       * ENDPOINTS:
-       *   GET /api/me/chats/?status=open
-       *   GET /api/me/chats/?status=closed
-       * SIDE EFFECTS: none on server; DOM updates on success.
+       *  BOUNDARY FUNCTION: loadChats()
        * =============================================================== */
       async function loadChats(){
         const open   = await j("/api/me/chats/?status=open");   // Boundary
@@ -154,13 +132,9 @@
         if (openId) openChat(openId); // Boundary
       }
 
-      /* ===============================================================
-       * ASYNC BOUNDARY FUNCTION: openChat(id)
-       * ---------------------------------------------------------------
-       * BCE ROLE: Boundary
-       * WHY: Fetches messages for a chat and renders them.
-       * ENDPOINT: GET /api/chats/:id/messages/
-       * =============================================================== */
+      /* ==================================
+       * BOUNDARY FUNCTION: openChat(id)
+       * ================================== */
       async function openChat(id){
         activeChatId = id;
         chatHeader.textContent = `Chat ${id}`;
@@ -173,16 +147,9 @@
         messages.scrollTop = messages.scrollHeight;
       }
 
-      /* ===============================================================
-       * CONTROLLER: sendForm submit → ASYNC BOUNDARY send message
-       * ---------------------------------------------------------------
-       * BCE ROLE (handler): Control
-       *   - Validates input, selects target chat
-       *   - Invokes Boundary POST to send message
-       *   - Refreshes thread by calling Boundary openChat
-       * BOUNDARY INSIDE:
-       *   POST /api/chats/:id/messages/  (sends { body })
-       * =============================================================== */
+      /* ========================
+        BOUNDARY send message
+       * =========================*/
       sendForm.addEventListener("submit", async (e)=>{
         e.preventDefault();
         if (!activeChatId) return;
@@ -209,10 +176,10 @@
         }
       });
 
-      // ---------------------- INIT (Controller → Boundary)
+      
       await loadChats(); // Boundary
 
-      // Re-open current chat if user navigates with back/forward and URL contains ?open=
+      
       window.addEventListener("popstate", async () => {
         const openId = new URL(location.href).searchParams.get("open");
         if (openId) openChat(openId); // Boundary

@@ -87,10 +87,7 @@
   </main>
 
   <script>
-    /* ============================ INFRA HELPER ============================
-     * $id: Async DOM lookup helper (not Boundary / Control / Entity / UI).
-     * Resolves element by id once DOM is ready; throws if not found.
-     * ===================================================================== */
+    /* ========= HELPER =================*/
     async function $id(id){
       const now = document.getElementById(id);
       if (now) return now;
@@ -106,21 +103,15 @@
       throw new Error(`Element with id="${id}" not found`);
     }
 
-    /* ============================ CONTROL HELPERS =========================
-     * Control = orchestrates the page flow; parses URL; decides what to load.
-     * --------------------------------------------------------------------- */
+    /* ========== CONTROL HELPERS ========= */
     function getReqIdFromPath(){
       const parts = location.pathname.replace(/\/+$/,'').split("/").filter(Boolean);
       // path looks like /pin_request/<REQ_ID>/
       return parts[parts.length-1];
     }
 
-    /* ============================ BOUNDARY (API) =========================
-     * All direct backend communication lives here (fetch / POST / GET).
-     * No UI rendering and no business orchestration inside these functions.
-     * --------------------------------------------------------------------- */
 
-    /** Boundary: generic GET → JSON (includes credentials) */
+    /** Boundary: GET → JSON (includes credentials) */
     async function fetchJSON(url){
       const r = await fetch(url, { credentials:"include" });
       if(!r.ok) throw new Error("HTTP "+r.status);
@@ -148,17 +139,14 @@
       return r.ok;
     }
 
-    /* ============================ ENTITY HELPERS =========================
-     * Entity = data shapes/transformations returned by backend (no I/O).
-     * Safe accessors/formatters operate on Entities.
-     * --------------------------------------------------------------------- */
+
     function getCookie(name){
       const v = `; ${document.cookie}`.split(`; ${name}=`);
       if (v.length===2) return v.pop().split(";").shift();
     }
     const csrftoken = getCookie("csrftoken");
 
-    /** Entity helper: preserve 0 / "0.00"; fallback only for null/undefined */
+
     function safe(val, fallback="—"){
       return (val !== undefined && val !== null) ? val : fallback;
     }
@@ -167,10 +155,7 @@
     /** Entity helper: detect typical image URLs for inline preview */
     function looksLikeImage(url){ return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url||""); }
 
-    /* ============================ BOUNDARY-UI (VIEW) ======================
-     * Pure presentation functions: take Entities and render DOM.
-     * No fetches and no orchestration here.
-     * --------------------------------------------------------------------- */
+    /* ========== BOUNDARY =========== */
 
     /** Boundary-UI: render the Request entity summary card */
     async function renderRequest(r){
@@ -196,7 +181,7 @@
       (await $id("card")).innerHTML = html;
     }
 
-    /** Boundary-UI: render the Claim entity details + optional receipt preview */
+    /** Boundary-UI: render the Claim entity details +  receipt preview */
     async function renderClaim(cl){
       // Entity fields used: id, category, expense_date, amount, payment_method,
       // description, status, receipt_url/receipt
@@ -244,10 +229,7 @@
       badge.classList.remove("hidden");
     }
 
-    /* ============================ CONTROL (FLOW) ==========================
-     * Coordinates Boundary calls and updates the Boundary-UI.
-     * Wires events, selects entities, and handles page lifecycle.
-     * --------------------------------------------------------------------- */
+
     (async () => {
       async function load(){
         const reqId = getReqIdFromPath();
@@ -314,10 +296,11 @@
           form.classList.add("hidden");
         }
 
-        // CONTROL: wire action buttons → BOUNDARY calls
+        
         (await $id("btnVerify")).addEventListener("click", async () => {
           msg.textContent = "Verifying…"; msg.className = "text-sm text-gray-600";
-          // Control → Boundary: verifyClaim()
+          
+
           const ok = await verifyClaim(cl.id);
           if (ok){
             msg.textContent = "Claim verified.";
@@ -343,7 +326,8 @@
           }
           msg.textContent = "Submitting dispute…";
           msg.className = "text-sm text-gray-600";
-          // Control → Boundary: disputeClaim()
+
+          // disputeClaim()
           const ok = await disputeClaim(cl.id, reason, comment);
           if (ok){
             msg.textContent = "Dispute submitted.";
@@ -356,7 +340,7 @@
         });
       }
 
-      // CONTROL: initial page load
+      
       await load();
     })();
   </script>
