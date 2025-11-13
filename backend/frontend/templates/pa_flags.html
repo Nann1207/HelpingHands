@@ -144,18 +144,31 @@
 
     let activeFlagId = null;
 
-    // Optional: default last 30 days (keep if you like)
+    // Default last 30 days
     function fmtDate(d){ return d.toISOString().slice(0,10); }
     function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
     fromInput.value = fmtDate(daysAgo(30));
     toInput.value   = fmtDate(new Date());
 
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: fetchJSON(url)
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       PURPOSE: Generic GET helper to call backend with credentials,
+                parse JSON, and surface HTTP errors. Single gateway
+                for reads.
+    ============================================================== */
     async function fetchJSON(url){
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) throw new Error("HTTP "+r.status);
       return r.json();
     }
 
+    /* ==============================================================
+       UI (Entity/Presentation): open/close modal helpers
+       --------------------------------------------------------------
+       Not Boundaries: No server I/O, only DOM manipulation.
+    ============================================================== */
     function openModal(flag){
       activeFlagId = flag.id;
       modalFlagId.textContent = flag.id;
@@ -171,6 +184,14 @@
       activeFlagId = null;
     }
 
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: load()
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       PURPOSE: Builds query params → GET /api/admin/flags/
+                → renders table + wires row actions.
+       ENDPOINT: /api/admin/flags/?resolved=...&flag_type=...&from=...&to=...
+    ============================================================== */
     async function load(){
       const params = new URLSearchParams();
       if (resolvedSel.value) params.set("resolved", resolvedSel.value);
@@ -179,7 +200,7 @@
       if (toInput.value)     params.set("to", toInput.value);
 
       const url = "/api/admin/flags/?" + params.toString();
-      const data = await fetchJSON(url);
+      const data = await fetchJSON(url); // Boundary call
 
       rows.innerHTML = "";
       (data || []).forEach(f => {
@@ -187,9 +208,9 @@
         tr.className = "border-t";
         const reason = f.reasonbycsr ?? f.reason ?? "";
         const created = f.created_at ? f.created_at.slice(0,19).replace("T"," ") : "";
-        const requestStatus = f.request_status ?? ""; // depends on serializer; safe fallback
+        const requestStatus = f.request_status ?? "";
         const serviceType = f.service_type ?? "";
-        const csrName = f.csr_name ?? f.csr ?? "-";   // depends on serializer; safe fallback
+        const csrName = f.csr_name ?? f.csr ?? "-";
 
         tr.innerHTML = `
           <td class="px-3 py-2">${f.id}</td>
@@ -213,7 +234,7 @@
 
       statusLine.textContent = `Loaded ${data?.length || 0} flags`;
 
-      // Hook up "Edit" buttons
+      // Wire each "Edit" to open modal (Control glue; no I/O)
       document.querySelectorAll("button.edit").forEach(btn => {
         btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-id");
@@ -224,7 +245,17 @@
       });
     }
 
-    // Submit decision
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: submitDecision()
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       PURPOSE: Sends the PA's resolution to the server
+                (Accept → /accept/, Reject → /reject/), then reloads.
+       ENDPOINTS:
+         POST /api/admin/flags/:id/accept/
+         POST /api/admin/flags/:id/reject/
+       BODY: { resolution_notes }
+    ============================================================== */
     async function submitDecision(){
       if (!activeFlagId) return;
       const decision = document.querySelector('input[name="decision"]:checked')?.value || "accept";
@@ -241,6 +272,7 @@
         : `/api/admin/flags/${activeFlagId}/reject/`;
 
       try{
+        // Boundary: POST resolution to server
         const resp = await fetch(endpoint, {
           method: "POST",
           credentials: "include",
@@ -252,23 +284,57 @@
         });
         if (!resp.ok){
           const t = await resp.text();
-          throw new Error(`HTTP ${resp.status} - ${t}`);
+          throw new Error(`HTTP ${resp.status}: ${t || "Failed to resolve flag."}`);
         }
+        await load();
         closeModal();
-        await load(); // refresh table
-      }catch(e){
-        modalError.textContent = `Failed: ${e.message}`;
+      }catch(err){
+        console.error(err);
+        modalError.textContent = err.message || "Something went wrong.";
         modalError.classList.remove("hidden");
       }
     }
-
-    // Events
-    applyBtn.addEventListener("click", load);
-    document.getElementById("modalCancel").addEventListener("click", closeModal);
-    document.getElementById("modalClose").addEventListener("click", closeModal);
-    modalSubmit.addEventListener("click", submitDecision);
-
-    window.addEventListener("DOMContentLoaded", load);
+    // ---------- Event wiring ----------
+    function bindFilters(){
+      [resolvedSel, ftypeSel].forEach(el => el.addEventListener("change", load));
+      [fromInput, toInput].forEach(el => el.addEventListener("change", () => {
+        if (fromInput.value && toInput.value && fromInput.value > toInput.value){
+          statusLine.textContent = "From date must be before To date.";
+          return;
+        }
+        load();
+      }));
+      applyBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        load();
+      });
+    }
+    function bindModalControls(){
+      const hide = () => closeModal();
+      modalClose.addEventListener("click", hide);
+      modalCancel.addEventListener("click", hide);
+      modalSubmit.addEventListener("click", submitDecision);
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) hide();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !modal.classList.contains("hidden")){
+          hide();
+        }
+      });
+    }
+    async function init(){
+      bindFilters();
+      bindModalControls();
+      statusLine.textContent = "Loading flags…";
+      try{
+        await load();
+      }catch(err){
+        console.error(err);
+        statusLine.textContent = "Failed to load flags.";
+      }
+    }
+    window.addEventListener("DOMContentLoaded", init);
   </script>
 </body>
 </html>

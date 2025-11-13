@@ -141,6 +141,7 @@
   </main>
 
   <script>
+    // ----------------------------- Helpers (UI/utility — not Boundary)
     function qs(sel){ return document.querySelector(sel); }
     function buildQuery(params){
       const pairs = Object.entries(params).filter(([_,v]) => v !== undefined && v !== null && v !== "");
@@ -158,23 +159,38 @@
 
     let requestsChart;
 
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: fetchJSON(url)
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       WHY: Performs HTTP GET to backend API with credentials,
+            parses JSON, throws on HTTP error. This function is the
+            frontend ↔ backend gateway in this page.
+    ============================================================== */
     async function fetchJSON(url){
       const resp = await fetch(url, { credentials: "include" });
       if (!resp.ok) throw new Error("HTTP "+resp.status);
       return resp.json();
     }
 
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: loadWhoAmI()
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       WHY: Verifies session by calling /api/auth/me/. On failure,
+            redirects to login. On success, updates #whoami.
+    ============================================================== */
     async function loadWhoAmI(){
       try{
-        const me = await fetchJSON("/api/auth/me/");
+        const me = await fetchJSON("/api/auth/me/"); // Boundary call
         qs("#whoami").textContent = `Logged in as ${me.username} (${me.role})`;
       }catch(e){
         location.href = "/login/?next=/pa_dashboard/";
       }
     }
 
+    // ----------------------------- Pure UI helpers (not Boundary)
     function updateApiLabel(fullUrl){
-      // show only path+query for clarity
       try{
         const u = new URL(fullUrl, window.location.origin);
         qs("#apiCall").textContent = `${u.pathname}${u.search}`;
@@ -195,13 +211,11 @@
     }
 
     function mapCardsToUI(cards){
-      // Your controller returns cards with human labels:
-      // "Review","Pending","Rejected","Active","Completed",
-      // "Open Flags","Resolved Flags","Number of PIN","Number of CV","Number of CSR"
-      qs("#kpiPins").textContent        = cards["Number of PIN"] ?? "0";
-      qs("#kpiCVs").textContent         = cards["Number of CV"] ?? "0";
-      qs("#kpiCSRs").textContent        = cards["Number of CSR"] ?? "0";
-      qs("#kpiOpenFlags").textContent   = cards["Open Flags"] ?? "0";
+      // Human-friendly labels coming from controller/service
+      qs("#kpiPins").textContent          = cards["Number of PIN"] ?? "0";
+      qs("#kpiCVs").textContent           = cards["Number of CV"] ?? "0";
+      qs("#kpiCSRs").textContent          = cards["Number of CSR"] ?? "0";
+      qs("#kpiOpenFlags").textContent     = cards["Open Flags"] ?? "0";
       qs("#kpiResolvedFlags").textContent = cards["Resolved Flags"] ?? "0";
 
       qs("#reqReview").textContent   = cards["Review"] ?? "0";
@@ -211,23 +225,31 @@
       qs("#reqComplete").textContent = cards["Completed"] ?? "0";
     }
 
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: loadMetrics()
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       WHY: Builds query → GET /api/admin/metrics/ → updates UI and
+            chart. Reads server state; does not mutate.
+       ENDPOINT: GET /api/admin/metrics/?from=...&to=...&granularity=...
+    ============================================================== */
     async function loadMetrics(){
       const params = {
         granularity: granSel.value || "day",
-        from: fromInput.value,  
-        to: toInput.value,      
+        from: fromInput.value,
+        to: toInput.value,
       };
       const query = buildQuery(params);
-      const url = `/api/admin/metrics/${query}`;   
+      const url = `/api/admin/metrics/${query}`;
       updateApiLabel(url);
 
-      // fetch data, GET request to /api/admin/metrics/ (The default HTTP method is GET)
+      // Boundary: fetch metrics
       const data = await fetchJSON(url);
 
-      // cards
+      // Cards
       mapCardsToUI(data.cards || {});
 
-      // chart series
+      // Chart series + range
       const series = (data.charts && data.charts.requests_by_status) ? data.charts.requests_by_status : [];
       const range  = (data.charts && data.charts.range) ? data.charts.range : null;
       qs("#seriesRange").textContent = range ? `${range.from} → ${range.to}` : "";
@@ -244,10 +266,10 @@
         {
           labels,
           datasets: [
-            { label: "Review",   data: review },
-            { label: "Pending",  data: pending },
-            { label: "Rejected", data: rejected },
-            { label: "Active",   data: active },
+            { label: "Review",    data: review },
+            { label: "Pending",   data: pending },
+            { label: "Rejected",  data: rejected },
+            { label: "Active",    data: active },
             { label: "Completed", data: complete },
           ]
         },
@@ -272,21 +294,35 @@
       buildExportLink();
     }
 
+    /* ==============================================================
+       CONTROLLER: resetFilters()
+       --------------------------------------------------------------
+       BCE ROLE: Control
+       WHY: Resets UI inputs, then triggers Boundary (loadMetrics).
+    ============================================================== */
     function resetFilters(){
       fromInput.value = "";
       toInput.value   = "";
       granSel.value   = "day";
-      loadMetrics();
+      loadMetrics(); // Boundary
     }
 
-    applyBtn.addEventListener("click", loadMetrics);
+    // Wire UI → Control/Boundary
+    applyBtn.addEventListener("click", loadMetrics); // Boundary
     resetBtn.addEventListener("click", resetFilters);
 
+    /* ==============================================================
+       INIT (Controller glue that triggers Boundaries on load)
+       --------------------------------------------------------------
+       On DOMContentLoaded:
+       - Verify session (Boundary)
+       - Build export link (UI)
+       - Load metrics (Boundary)
+    ============================================================== */
     window.addEventListener("DOMContentLoaded", async () => {
-      await loadWhoAmI();
-      // defaults: empty dates (show all), day granularity
-      buildExportLink();
-      await loadMetrics();
+      await loadWhoAmI();  // Boundary
+      buildExportLink();   // UI
+      await loadMetrics(); // Boundary
     });
   </script>
 </body>

@@ -1,10 +1,19 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>My Requests · Helping Hands</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Prevent cached/bfcache dashboard after logout/back -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) { window.location.reload(); }
+    });
+  </script>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <!-- Top Bar -->
@@ -73,64 +82,150 @@
   </a>
 
   <script>
-    const rows = document.getElementById("rows");
-    const statusLine = document.getElementById("statusLine");
-    const tabs = document.querySelectorAll(".tab");
-    let current = "pending";
+    /**
+     * ============================================================
+     * ASYNC DOM LOOKUP: $id(id)
+     * ------------------------------------------------------------
+     * BCE ROLE: Presentation (UI helper) — NOT a Boundary.
+     * WHY: Robustly resolves an element by id using async pattern,
+     *      matching your "await DOM helper" style.
+     * ============================================================
+     */
+    async function $id(id) {
+      const now = document.getElementById(id);
+      if (now) return now;
 
-    async function fetchJSON(url){
-      const r = await fetch(url, { credentials: "include" });
-      if (!r.ok) throw new Error("HTTP "+r.status);
-      return r.json();
-    }
-
-    function setActiveTab(name){
-      current = name;
-      tabs.forEach(t => {
-        if (t.dataset.tab === name) t.classList.add("bg-white","border-gray-900");
-        else t.classList.remove("bg-white","border-gray-900");
-      });
-    }
-
-    function rowHtml(r){
-      const created   = (r.created_at||"").slice(0,10);
-      const apptDate  = (r.appointment_date||"");
-      const apptTime  = (r.appointment_time||"").slice(0,5);
-      return `
-        <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${r.id}">
-          <td class="px-3 py-2 font-medium">${r.id}</td>
-          <td class="px-3 py-2">${r.service_type}</td>
-          <td class="px-3 py-2">${created}</td>
-          <td class="px-3 py-2">${apptDate}</td>
-          <td class="px-3 py-2">${apptTime}</td>
-          <td class="px-3 py-2">${r.pickup_location}</td>
-          <td class="px-3 py-2">${r.service_location}</td>
-          <td class="px-3 py-2 text-center">${r.shortlist_count ?? 0}</td>
-          <td class="px-3 py-2 capitalize">${r.status}</td>
-        </tr>`;
-    }
-
-    async function load(status){
-      setActiveTab(status);
-      rows.innerHTML = `<tr><td class="px-3 py-4 text-gray-500" colspan="9">Loading…</td></tr>`;
-
-      const data = await fetchJSON(`/api/pin/my/requests/?status=${encodeURIComponent(status)}`);
-      rows.innerHTML = (data||[]).map(rowHtml).join("") || 
-        `<tr><td class="px-3 py-4 text-gray-500" colspan="9">No requests.</td></tr>`;
-      statusLine.textContent = `Loaded ${data?.length || 0} ${status} requests`;
-
-      // click-to-detail
-      document.querySelectorAll("tbody#rows tr[data-id]").forEach(tr => {
-        tr.addEventListener("click", () => {
-          const id = tr.getAttribute("data-id");
-          location.href = `/pin_request/${id}/`;
+      if (document.readyState === "loading") {
+        await new Promise(resolve => {
+          document.addEventListener("DOMContentLoaded", resolve, { once: true });
         });
-      });
+      } else {
+        await new Promise(r => requestAnimationFrame(r));
+      }
+
+      const later = document.getElementById(id);
+      if (later) return later;
+      throw new Error(`Element with id="${id}" not found`);
     }
 
-    tabs.forEach(t => t.addEventListener("click", () => load(t.dataset.tab)));
+    /**
+     * ============================================================
+     * PAGE MODULE (async IIFE)
+     * ------------------------------------------------------------
+     * Acts as the Controller layer: wires UI events to Boundary
+     * functions and updates the Presentation (DOM).
+     * ============================================================
+     */
+    (async () => {
+      // ---------- PRESENTATION: acquire DOM refs via async helper ----------
+      const rows       = await $id("rows");        // <tbody id="rows">
+      const statusLine = await $id("statusLine");  // <p id="statusLine">
+      // Tab buttons are UI-only; keeping querySelectorAll as-is.
+      const tabs = document.querySelectorAll(".tab");
 
-    window.addEventListener("DOMContentLoaded", () => load(current));
+      // ---------- CONTROLLER STATE ----------
+      let current = "pending"; // default tab
+
+      /**
+       * ==========================================================
+       * ASYNC BOUNDARY: fetchJSON(url)
+       * ----------------------------------------------------------
+       * BCE ROLE: Boundary
+       * PURPOSE: Single HTTP GET gateway to backend (credentials
+       *          included). Throws on non-2xx.
+       * NOTE: Centralizing network I/O makes Boundary explicit.
+       * ==========================================================
+       */
+      async function fetchJSON(url) {
+        const r = await fetch(url, { credentials: "include" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }
+
+      /**
+       * ---------- PRESENTATION: tab styles ----------
+       * Not a Boundary; pure visual state.
+       */
+      function setActiveTab(name) {
+        current = name;
+        tabs.forEach(t => {
+          if (t.dataset.tab === name) {
+            t.classList.add("bg-white", "border-gray-900");
+          } else {
+            t.classList.remove("bg-white", "border-gray-900");
+          }
+        });
+      }
+
+      /**
+       * ---------- PRESENTATION: row template ----------
+       * Not a Boundary; formats server data for the UI.
+       */
+      function rowHtml(r) {
+        const created  = (r.created_at || "").slice(0, 10);       // "YYYY-MM-DD"
+        const apptDate = (r.appointment_date || "");              // as-is
+        const apptTime = (r.appointment_time || "").slice(0, 5);  // "HH:MM"
+        return `
+          <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${r.id}">
+            <td class="px-3 py-2 font-medium">${r.id}</td>
+            <td class="px-3 py-2">${r.service_type}</td>
+            <td class="px-3 py-2">${created}</td>
+            <td class="px-3 py-2">${apptDate}</td>
+            <td class="px-3 py-2">${apptTime}</td>
+            <td class="px-3 py-2">${r.pickup_location}</td>
+            <td class="px-3 py-2">${r.service_location}</td>
+            <td class="px-3 py-2 text-center">${r.shortlist_count ?? 0}</td>
+            <td class="px-3 py-2 capitalize">${r.status}</td>
+          </tr>`;
+      }
+
+      /**
+       * ==========================================================
+       * ASYNC BOUNDARY + CONTROLLER: load(status)
+       * ----------------------------------------------------------
+       * BCE ROLE:
+       *   - Boundary: performs GET /api/pin/my/requests/?status=…
+       *   - Controller: updates UI based on response, wires clicks.
+       * FLOW:
+       *   1) setActiveTab (Presentation)
+       *   2) fetchJSON(...)  <-- Boundary call
+       *   3) render table / empty state (Presentation)
+       *   4) wire row click handlers (Controller → navigation)
+       * ==========================================================
+       */
+      async function load(status) {
+        setActiveTab(status); // Presentation
+
+        // Simple loading row (Presentation)
+        rows.innerHTML =
+          `<tr><td class="px-3 py-4 text-gray-500" colspan="9">Loading…</td></tr>`;
+
+        // Boundary: fetch request list for the given status
+        const data = await fetchJSON(`/api/pin/my/requests/?status=${encodeURIComponent(status)}`);
+
+        // Presentation: render rows / empty state
+        rows.innerHTML =
+          (data || []).map(rowHtml).join("") ||
+          `<tr><td class="px-3 py-4 text-gray-500" colspan="9">No requests.</td></tr>`;
+
+        // Presentation: status line
+        statusLine.textContent = `Loaded ${data?.length || 0} ${status} requests`;
+
+        // Controller: row click → navigate to detail (UI routing)
+        document.querySelectorAll("tbody#rows tr[data-id]").forEach(tr => {
+          tr.addEventListener("click", () => {
+            const id = tr.getAttribute("data-id");
+            location.href = `/pin_request/${id}/`;
+          });
+        });
+      }
+
+      // ---------- CONTROLLER: tab click handlers ----------
+      tabs.forEach(t => t.addEventListener("click", () => load(t.dataset.tab)));
+
+      // ---------- CONTROLLER: initial load (defaults to "pending") ----------
+      await load(current);
+    })();
   </script>
 </body>
 </html>

@@ -4,7 +4,16 @@
   <meta charset="utf-8" />
   <title>Messages · Helping Hands</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Prevent cached/bfcache after logout/back -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) { window.location.reload(); }
+    });
+  </script>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
@@ -36,76 +45,179 @@
   </main>
 
   <script>
-    function qs(s){return document.querySelector(s)}
-    function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
-    async function j(u,o){const r=await fetch(u,{credentials:"include",...o}); if(!r.ok) throw new Error(await r.text()); return r.json();}
+    /* ============================================================
+     * ASYNC DOM QUERY HELPER (UI/Presentation — NOT Boundary)
+     * ------------------------------------------------------------
+     * Usage: const el = await $qs("#id-or-selector")
+     * - Resolves immediately if element exists.
+     * - Otherwise waits for DOMContentLoaded / next frame then tries again.
+     * - Throws a clear error if still not found.
+     * ============================================================ */
+    async function $qs(selector){
+      let el = document.querySelector(selector);
+      if (el) return el;
 
-    const chatList = qs("#chatList");
-    const messages = qs("#messages");
-    const sendForm = qs("#sendForm");
-    const msgInput = qs("#msg");
-    const chatHeader = qs("#chatHeader");
-    let activeChatId = null;
+      if (document.readyState === "loading"){
+        await new Promise(res => document.addEventListener("DOMContentLoaded", res, { once: true }));
+      } else {
+        await new Promise(res => requestAnimationFrame(res));
+      }
 
-    function li(c){
-      const open = c.is_open ? `<span class="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">Open</span>`
-                             : `<span class="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Closed</span>`;
-      return `<button data-id="${c.id}" class="w-full text-left px-3 py-2 hover:bg-gray-50">
-        <div class="font-medium">${c.service_type}</div>
-        <div class="text-xs text-gray-500">Req ${c.request_id} • ${open}</div>
-      </button>`;
+      el = document.querySelector(selector);
+      if (el) return el;
+
+      throw new Error(`Element not found for selector: ${selector}`);
     }
 
-    async function loadChats(){
-      const open = await j("/api/me/chats/?status=open");
-      const closed = await j("/api/me/chats/?status=closed");
-      chatList.innerHTML = `
-        <div class="px-3 py-1 text-xs uppercase text-gray-500">Open</div>
-        ${(open||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No open chats</div>'}
-        <div class="px-3 py-1 text-xs uppercase text-gray-500">Past</div>
-        ${(closed||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No past chats</div>'}
-      `;
+    /* ============== Small helpers (UI only — NOT Boundary) ============== */
+    function getCookie(name){
+      const v = `; ${document.cookie}`;
+      const p = v.split(`; ${name}=`);
+      if (p.length === 2) return p.pop().split(';').shift();
+    }
 
-      // click to load
-      chatList.querySelectorAll("button[data-id]").forEach(b=>{
-        b.addEventListener("click", ()=> openChat(b.getAttribute("data-id")));
+    /* =====================================================================
+     * ASYNC BOUNDARY FUNCTION: j(u, o)
+     * ---------------------------------------------------------------------
+     * BCE ROLE: Boundary
+     * WHY: Generic fetch → JSON gateway with credentials and error surfacing.
+     *      All backend I/O on this page routes through here.
+     * CONTRACT:
+     *   - GET:  j("/api/…")
+     *   - POST: j("/api/…", { method:"POST", headers:{...}, body: JSON.stringify({...}) })
+     * ERROR: throws Error(message) if response !ok
+     * ===================================================================== */
+    async function j(u,o){
+      const r = await fetch(u,{ credentials:"include", ...(o||{}) });
+      if(!r.ok){
+        // Try to surface server message for debugging
+        let t;
+        try { t = await r.text(); } catch {}
+        throw new Error(t || `HTTP ${r.status}`);
+      }
+      return r.json();
+    }
+
+    /* =================== Page logic inside async IIFE ===================
+     * IIFE acts as CONTROLLER glue (wires UI to Boundary calls).
+     * =================================================================== */
+    (async () => {
+      // Acquire DOM refs via awaited async helper (requested pattern)
+      const chatList   = await $qs("#chatList");
+      const messages   = await $qs("#messages");
+      const sendForm   = await $qs("#sendForm");
+      const msgInput   = await $qs("#msg");
+      const chatHeader = await $qs("#chatHeader");
+
+      let activeChatId = null;
+
+      // ---------------- UI renderer (Presentation — NOT Boundary)
+      function li(c){
+        const open = c.is_open
+          ? `<span class="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">Open</span>`
+          : `<span class="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">Closed</span>`;
+        return `<button data-id="${c.id}" class="w-full text-left px-3 py-2 hover:bg-gray-50">
+          <div class="font-medium">${c.service_type}</div>
+          <div class="text-xs text-gray-500">Req ${c.request_id} • ${open}</div>
+        </button>`;
+      }
+
+      /* ===============================================================
+       * ASYNC BOUNDARY FUNCTION: loadChats()
+       * ---------------------------------------------------------------
+       * BCE ROLE: Boundary
+       * WHY: Reads user’s chats from server, then renders list (UI).
+       * ENDPOINTS:
+       *   GET /api/me/chats/?status=open
+       *   GET /api/me/chats/?status=closed
+       * SIDE EFFECTS: none on server; DOM updates on success.
+       * =============================================================== */
+      async function loadChats(){
+        const open   = await j("/api/me/chats/?status=open");   // Boundary
+        const closed = await j("/api/me/chats/?status=closed"); // Boundary
+
+        chatList.innerHTML = `
+          <div class="px-3 py-1 text-xs uppercase text-gray-500">Open</div>
+          ${(open||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No open chats</div>'}
+          <div class="px-3 py-1 text-xs uppercase text-gray-500">Past</div>
+          ${(closed||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No past chats</div>'}
+        `;
+
+        // CONTROLLER: wire list → openChat (Boundary)
+        chatList.querySelectorAll("button[data-id]").forEach(b=>{
+          b.addEventListener("click", ()=> openChat(b.getAttribute("data-id")));
+        });
+
+        // Optional autoselect if ?open=<id>
+        const url = new URL(location.href);
+        const openId = url.searchParams.get("open");
+        if (openId) openChat(openId); // Boundary
+      }
+
+      /* ===============================================================
+       * ASYNC BOUNDARY FUNCTION: openChat(id)
+       * ---------------------------------------------------------------
+       * BCE ROLE: Boundary
+       * WHY: Fetches messages for a chat and renders them.
+       * ENDPOINT: GET /api/chats/:id/messages/
+       * =============================================================== */
+      async function openChat(id){
+        activeChatId = id;
+        chatHeader.textContent = `Chat ${id}`;
+        const msgs = await j(`/api/chats/${id}/messages/`); // Boundary
+        messages.innerHTML = (msgs||[]).map(m => `
+          <div class="text-sm">
+            <div class="text-[11px] text-gray-500">${m.sender} · ${m.created_at?.replace("T"," ").slice(0,16)}</div>
+            <div class="px-3 py-2 bg-gray-100 inline-block rounded-md mt-0.5">${m.body}</div>
+          </div>`).join("");
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      /* ===============================================================
+       * CONTROLLER: sendForm submit → ASYNC BOUNDARY send message
+       * ---------------------------------------------------------------
+       * BCE ROLE (handler): Control
+       *   - Validates input, selects target chat
+       *   - Invokes Boundary POST to send message
+       *   - Refreshes thread by calling Boundary openChat
+       * BOUNDARY INSIDE:
+       *   POST /api/chats/:id/messages/  (sends { body })
+       * =============================================================== */
+      sendForm.addEventListener("submit", async (e)=>{
+        e.preventDefault();
+        if (!activeChatId) return;
+
+        const body = (msgInput.value || "").trim();
+        if (!body) return;
+
+        try{
+          // Boundary: send message
+          await j(`/api/chats/${activeChatId}/messages/`, {
+            method:"POST",
+            headers:{
+              "Content-Type":"application/json",
+              "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: JSON.stringify({ body })
+          });
+          msgInput.value = "";
+          // Boundary: reload thread after send
+          await openChat(activeChatId);
+        }catch(err){
+          alert("Failed to send (maybe chat closed).");
+          console.error(err);
+        }
       });
 
-      // optional autoselect if ?open=<id>
-      const url = new URL(location.href);
-      const openId = url.searchParams.get("open");
-      if (openId) openChat(openId);
-    }
+      // ---------------------- INIT (Controller → Boundary)
+      await loadChats(); // Boundary
 
-    async function openChat(id){
-      activeChatId = id;
-      chatHeader.textContent = `Chat ${id}`;
-      const msgs = await j(`/api/chats/${id}/messages/`);
-      messages.innerHTML = msgs.map(m => `
-        <div class="text-sm">
-          <div class="text-[11px] text-gray-500">${m.sender} · ${m.created_at?.replace("T"," ").slice(0,16)}</div>
-          <div class="px-3 py-2 bg-gray-100 inline-block rounded-md mt-0.5">${m.body}</div>
-        </div>`).join("");
-      messages.scrollTop = messages.scrollHeight;
-    }
-
-    sendForm.addEventListener("submit", async (e)=>{
-      e.preventDefault();
-      if(!activeChatId) return;
-      const body = (msgInput.value||"").trim();
-      if(!body) return;
-      try{
-        const m = await j(`/api/chats/${activeChatId}/messages/`, {
-          method:"POST",
-          headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},
-          body: JSON.stringify({ body })
-        });
-        msgInput.value = "";
-        openChat(activeChatId);
-      }catch(e){ alert("Failed to send (maybe chat closed)."); }
-    });
-
-    window.addEventListener("DOMContentLoaded", loadChats);
+      // Re-open current chat if user navigates with back/forward and URL contains ?open=
+      window.addEventListener("popstate", async () => {
+        const openId = new URL(location.href).searchParams.get("open");
+        if (openId) openChat(openId); // Boundary
+      });
+    })();
   </script>
 </body>
 </html>

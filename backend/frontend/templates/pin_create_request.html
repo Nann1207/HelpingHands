@@ -4,7 +4,16 @@
   <meta charset="utf-8" />
   <title>Create Help Request · Helping Hands</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Prevent cached/bfcache after logout/back -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) { window.location.reload(); }
+    });
+  </script>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
@@ -62,28 +71,97 @@
   </main>
 
   <script>
-    function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
-    async function j(url,opts){const r=await fetch(url,{credentials:"include",...opts});if(!r.ok) throw new Error(await r.text());return r.json();}
-    const form = document.getElementById("f");
-    const note = document.getElementById("note");
-    document.getElementById("cancel").addEventListener("click",()=>location.href="/pin_dashboard/");
-
-    form.addEventListener("submit", async (e)=>{
-      e.preventDefault();
-      const fd = new FormData(form);
-      const payload = Object.fromEntries(fd.entries());
-      try{
-        const resp = await j("/api/pin/requests/", {
-          method:"POST",
-          headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},
-          body: JSON.stringify(payload)
-        });
-        note.textContent = "Request submitted. It may appear as Review or Pending depending on moderation.";
-        setTimeout(()=>location.href="/pin_dashboard/", 800);
-      }catch(err){
-        alert("Failed to submit: "+err.message);
+    /* ==============================================================
+       ASYNC DOM LOOKUP: $id(id)
+       --------------------------------------------------------------
+       BCE ROLE: Presentation (UI helper) — NOT a Boundary.
+       PURPOSE: Robustly returns an element by id, awaiting DOM ready
+                if necessary. No server I/O here.
+    ============================================================== */
+    async function $id(id){
+      const el = document.getElementById(id);
+      if (el) return el;
+      if (document.readyState === "loading"){
+        await new Promise(r => document.addEventListener("DOMContentLoaded", r, { once: true }));
+      } else {
+        await new Promise(r => requestAnimationFrame(r));
       }
-    });
+      const retry = document.getElementById(id);
+      if (retry) return retry;
+      throw new Error(`Element with id="${id}" not found`);
+    }
+
+    /* ================= UI cookie helper (not Boundary) ================ */
+    function getCookie(name){
+      const v = `; ${document.cookie}`;
+      const p = v.split(`; ${name}=`);
+      if (p.length === 2) return p.pop().split(';').shift();
+    }
+
+    /* ==============================================================
+       ASYNC BOUNDARY FUNCTION: j(url, opts)
+       --------------------------------------------------------------
+       BCE ROLE: Boundary
+       PURPOSE: Single gateway for backend HTTP calls (fetch→JSON)
+                with credentials, surfaces server errors.
+       USAGE:
+         - GET   await j("/api/…")
+         - POST  await j("/api/…", { method:"POST", headers:{…}, body: JSON.stringify(data) })
+    ============================================================== */
+    async function j(url,opts){
+      const r = await fetch(url,{ credentials:"include", ...(opts||{}) });
+      if(!r.ok){
+        let text; try{text=await r.text();}catch{}
+        throw new Error(text || `HTTP ${r.status}`);
+      }
+      return r.json();
+    }
+
+    /* ==============================================================
+       PAGE CONTROLLER (IIFE): wires UI → Boundary calls
+       --------------------------------------------------------------
+       - Cancel button: UI navigation (not Boundary)
+       - Submit handler: validates + Boundary POST to create request
+    ============================================================== */
+    (async () => {
+      const form      = await $id("f");
+      const note      = await $id("note");
+      const cancelBtn = await $id("cancel");
+
+      // UI only — not a Boundary
+      cancelBtn.addEventListener("click", ()=> location.href="/pin_dashboard/");
+
+      /* ------------------------------------------------------------
+         CONTROLLER: form submit → ASYNC BOUNDARY POST
+         BCE ROLE: Control (handler) that invokes Boundary (j POST)
+         ENDPOINT: POST /api/pin/requests/
+         BODY:     { service_type, appointment_date, appointment_time,
+                     pickup_location, service_location, description }
+      ------------------------------------------------------------ */
+      form.addEventListener("submit", async (e)=>{
+        e.preventDefault();
+        const fd = new FormData(form);
+        const payload = Object.fromEntries(fd.entries());
+
+        try{
+          // Boundary call (create request)
+          await j("/api/pin/requests/", {
+            method:"POST",
+            headers:{
+              "Content-Type":"application/json",
+              "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: JSON.stringify(payload)
+          });
+
+          // UI feedback (not Boundary)
+          note.textContent = "Request submitted. It may appear as Review or Pending depending on moderation.";
+          setTimeout(()=> location.href="/pin_dashboard/", 800);
+        }catch(err){
+          alert("Failed to submit: " + err.message);
+        }
+      });
+    })();
   </script>
 </body>
 </html>

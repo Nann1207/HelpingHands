@@ -4,7 +4,16 @@
   <meta charset="utf-8" />
   <title>Profile · Helping Hands</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Prevent cached/bfcache after logout/back -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) { window.location.reload(); }
+    });
+  </script>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
 <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
@@ -40,7 +49,8 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <button id="sendOtp" type="button" onclick =sendOtp() class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
+      <!-- UI button; handler below calls Boundary -->
+      <button id="sendOtp" type="button" onclick="sendOtp()" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
       <input id="otpCode" maxlength="6" placeholder="Enter OTP" class="border rounded-md px-3 py-1.5 w-32" />
       <button id="saveProfile" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Save Changes</button>
     </div>
@@ -60,12 +70,43 @@
 </main>
 
 <script>
+  /* ============================================================
+     ASYNC DOM HELPER — Presentation utility (NOT a Boundary)
+     ------------------------------------------------------------
+     Role: Presentation (view helper). No server I/O.
+     Pattern: await $id("name")
+  ============================================================ */
+  async function $id(id){
+    const now = document.getElementById(id);
+    if (now) return now;
+
+    if (document.readyState === "loading"){
+      await new Promise(res => document.addEventListener("DOMContentLoaded", res, { once: true }));
+    } else {
+      await new Promise(res => requestAnimationFrame(res));
+    }
+
+    const later = document.getElementById(id);
+    if (later) return later;
+    throw new Error(`Element with id="${id}" not found`);
+  }
+
+  /* ============================================================
+     COOKIE / CSRF — Presentation utility (NOT a Boundary)
+     ------------------------------------------------------------
+     Role: Presentation helper used by Boundary functions.
+  ============================================================ */
   function getCookie(name) {
     const v = `; ${document.cookie}`; const p = v.split(`; ${name}=`);
     if (p.length === 2) return p.pop().split(';').shift();
   }
   const csrftoken = getCookie('csrftoken');
 
+  /* ============================================================
+     ERROR MESSAGE PICKER — Presentation utility (NOT a Boundary)
+     ------------------------------------------------------------
+     Role: Formats server error payload for user feedback.
+  ============================================================ */
   function pickErrorMessage(payload, fallback){
     if (!payload || typeof payload !== "object") return fallback;
     if (typeof payload.detail === "string") return payload.detail;
@@ -87,11 +128,25 @@
     return fallback;
   }
 
+  /* ============================================================
+     fetchJSON — ASYNC BOUNDARY (GET)
+     ------------------------------------------------------------
+     BCE Role: Boundary (talks to backend)
+     Use: const me = await fetchJSON("/api/auth/me/");
+  ============================================================ */
   async function fetchJSON(url){
     const r = await fetch(url, { credentials:"include" });
     if (!r.ok) throw new Error("HTTP "+r.status);
     return r.json();
   }
+
+  /* ============================================================
+     postJSON — ASYNC BOUNDARY (POST)
+     ------------------------------------------------------------
+     BCE Role: Boundary (talks to backend)
+     Use: const {ok,data} = await postJSON("/api/...", body)
+     Notes: Adds CSRF + JSON headers, returns {ok,status,data}
+  ============================================================ */
   async function postJSON(url, body){
     try{
       const resp = await fetch(url, {
@@ -108,85 +163,116 @@
     }
   }
 
-  // Naive load of current profile (use /api/auth/me/ if it exposes fields, else skip prefill)
-  async function prefill(){
-    try{
-      const me = await fetchJSON("/api/auth/me/");
-      document.getElementById("name").value = me.name ?? "";
-      document.getElementById("phone").value = me.phone ?? "";
-      document.getElementById("address").value = me.address ?? "";
-      if (me.preferred_cv_gender) document.getElementById("prefGender").value = me.preferred_cv_gender;
-      if (me.preferred_cv_language) document.getElementById("prefLang").value = me.preferred_cv_language;
-    }catch{}
-  }
-  async function sendOtp(){
-    try{
-      const r = await postJSON("/api/pin/profile/otp/start/", {});
-      const msg = document.getElementById("msg");
-      if (r.ok){ msg.textContent = "OTP sent to your email."; msg.className="text-green-700 text-sm"; }
-      else {
-        msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
-        msg.className="text-red-700 text-sm";
+  /* ============================================================
+     PAGE MODULE (async IIFE) — Controller + Presentation
+     ------------------------------------------------------------
+     - Controller: wires events, calls Boundary, updates UI
+     - Presentation: writes textContent / classes
+  ============================================================ */
+  (async () => {
+    /* ---------------------------------------------
+       prefill() — Controller uses Boundary (GET)
+       BCE: Calls fetchJSON (Boundary) to hydrate UI.
+    --------------------------------------------- */
+    async function prefill(){
+      try{
+        const me = await fetchJSON("/api/auth/me/"); // Boundary
+        (await $id("name")).value    = me.name ?? "";
+        (await $id("phone")).value   = me.phone ?? "";
+        (await $id("address")).value = me.address ?? "";
+        if (me.preferred_cv_gender)   (await $id("prefGender")).value = me.preferred_cv_gender;
+        if (me.preferred_cv_language) (await $id("prefLang")).value   = me.preferred_cv_language;
+      }catch{
+        // Non-fatal: stay silent if endpoint not available
       }
-    }catch{}
-  }
-  // document.getElementById("sendOtp").onclick = async (ev) => {
-  //   ev.preventDefault();
-  //   const r = await postJSON("/api/pin/profile/otp/start/", {});
-  //   const msg = document.getElementById("msg");
-  //   if (r.ok){ msg.textContent = "OTP sent to your email."; msg.className="text-green-700 text-sm"; }
-  //   else {
-  //     msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
-  //     msg.className="text-red-700 text-sm";
-  //   }
-  // };
+    }
 
-  document.getElementById("saveProfile").onclick = async (ev) => {
-    ev.preventDefault();
-    const code = document.getElementById("otpCode").value.trim();
-    const fields = {
-      name: document.getElementById("name").value,
-      phone: document.getElementById("phone").value,
-      address: document.getElementById("address").value,
-      preferred_cv_gender: document.getElementById("prefGender").value,
-      preferred_cv_language: document.getElementById("prefLang").value,
+    /* --------------------------------------------------------------
+       sendOtp() — Controller invoking Boundary (POST)
+       BCE: postJSON("/api/pin/profile/otp/start/", {})
+       UI: writes #msg
+    -------------------------------------------------------------- */
+    window.sendOtp = async function sendOtp(){
+      try{
+        const r = await postJSON("/api/pin/profile/otp/start/", {}); // Boundary
+        const msg = await $id("msg");
+        if (r.ok){
+          msg.textContent = "OTP sent to your email.";
+          msg.className   = "text-green-700 text-sm";
+        } else {
+          msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
+          msg.className   = "text-red-700 text-sm";
+        }
+      }catch{/* swallow */}
     };
-    const r = await postJSON("/api/pin/profile/otp/confirm/", { code, fields });
-    const msg = document.getElementById("msg");
-    if (r.ok){ msg.textContent = "Profile updated."; msg.className="text-green-700 text-sm"; }
-    else {
-      msg.textContent = pickErrorMessage(r.data, "Invalid OTP or save failed.");
-      msg.className="text-red-700 text-sm";
-    }
-  };
 
-  document.getElementById("sendPwdOtp").onclick = async (ev) => {
-    ev.preventDefault();
-    // reuse start endpoint but NOTE: your controller expects purpose=PASSWORD_CHANGE
-    // You can either add a dedicated start endpoint, or (quick demo) reuse profile start and seed a PASSWORD_CHANGE OTP in DB.
-    const r = await postJSON("/api/pin/password/otp/start/", {}); // or create /api/pin/password/otp/start
-    const msg = document.getElementById("pwdMsg");
-    if (r.ok){ msg.textContent = "OTP sent."; msg.className="text-green-700 text-sm"; }
-    else {
-      msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
-      msg.className="text-red-700 text-sm";
-    }
-  };
+    /* ----------------------------------------------------------------
+       Save Profile — Controller invoking Boundary (POST)
+       BCE: postJSON("/api/pin/profile/otp/confirm/", { code, fields })
+       UI: shows success/error in #msg
+    ---------------------------------------------------------------- */
+    (await $id("saveProfile")).addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const code = (await $id("otpCode")).value.trim();
+      const fields = {
+        name:  (await $id("name")).value,
+        phone: (await $id("phone")).value,
+        address: (await $id("address")).value,
+        preferred_cv_gender:   (await $id("prefGender")).value,
+        preferred_cv_language: (await $id("prefLang")).value,
+      };
+      const r = await postJSON("/api/pin/profile/otp/confirm/", { code, fields }); // Boundary
+      const msg = await $id("msg");
+      if (r.ok){
+        msg.textContent = "Profile updated.";
+        msg.className   = "text-green-700 text-sm";
+      } else {
+        msg.textContent = pickErrorMessage(r.data, "Invalid OTP or save failed.");
+        msg.className   = "text-red-700 text-sm";
+      }
+    });
 
-  document.getElementById("changePwd").onclick = async (ev) => {
-    ev.preventDefault();
-    const code = document.getElementById("pwdOtp").value.trim();
-    const new_password = document.getElementById("newPwd").value;
-    const r = await postJSON("/api/pin/password/change/", { code, new_password });
-    const msg = document.getElementById("pwdMsg");
-    if (r.ok){ msg.textContent = "Password updated."; msg.className="text-green-700 text-sm"; }
-    else {
-      msg.textContent = pickErrorMessage(r.data, "Invalid OTP or error updating password.");
-      msg.className="text-red-700 text-sm";
-    }
-  };
+    /* --------------------------------------------------------------
+       Send Password OTP — Controller invoking Boundary (POST)
+       BCE: postJSON("/api/pin/password/otp/start/", {})
+       UI: writes #pwdMsg
+    -------------------------------------------------------------- */
+    (await $id("sendPwdOtp")).addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const r = await postJSON("/api/pin/password/otp/start/", {}); // Boundary (adjust if needed)
+      const msg = await $id("pwdMsg");
+      if (r.ok){
+        msg.textContent = "OTP sent.";
+        msg.className   = "text-green-700 text-sm";
+      } else {
+        msg.textContent = pickErrorMessage(r.data, "Failed to send OTP.");
+        msg.className   = "text-red-700 text-sm";
+      }
+    });
 
-  window.addEventListener("DOMContentLoaded", prefill);
+    /* --------------------------------------------------------------
+       Change Password — Controller invoking Boundary (POST)
+       BCE: postJSON("/api/pin/password/change/", { code, new_password })
+       UI: writes #pwdMsg
+    -------------------------------------------------------------- */
+    (await $id("changePwd")).addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const code = (await $id("pwdOtp")).value.trim();
+      const new_password = (await $id("newPwd")).value;
+      const r = await postJSON("/api/pin/password/change/", { code, new_password }); // Boundary
+      const msg = await $id("pwdMsg");
+      if (r.ok){
+        msg.textContent = "Password updated.";
+        msg.className   = "text-green-700 text-sm";
+      } else {
+        msg.textContent = pickErrorMessage(r.data, "Invalid OTP or error updating password.");
+        msg.className   = "text-red-700 text-sm";
+      }
+    });
+
+    // Controller: initial hydrate
+    await prefill();
+  })();
 </script>
 </body>
 </html>
