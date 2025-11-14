@@ -91,16 +91,14 @@
       throw new Error(`Element with id="${id}" not found`);
     }
 
-    /* ================= UI cookie helper================ */
+
     function getCookie(name){
       const v = `; ${document.cookie}`;
       const p = v.split(`; ${name}=`);
       if (p.length === 2) return p.pop().split(';').shift();
     }
 
-    /* ============
-        BOUNDARY FUNCTION: j(url, opts)
-       ------------ */
+  
     async function j(url,opts){
       const r = await fetch(url,{ credentials:"include", ...(opts||{}) });
       if(!r.ok){
@@ -110,15 +108,13 @@
       return r.json();
     }
 
-    /* ==============================================================
-       PAGE CONTROLLER: wires UI to the Boundary calls
-      ========================================= */
+
     (async () => {
       const form      = await $id("f");
       const note      = await $id("note");
       const cancelBtn = await $id("cancel");
 
-      // UI only — not a Boundary
+
       cancelBtn.addEventListener("click", ()=> location.href="/pin_dashboard/");
 
 
@@ -128,7 +124,7 @@
         const payload = Object.fromEntries(fd.entries());
 
         try{
-          // Boundary call (create request)
+ 
           await j("/api/pin/requests/", {
             method:"POST",
             headers:{
@@ -138,7 +134,7 @@
             body: JSON.stringify(payload)
           });
 
-          // UI feedback (not Boundary)
+
           note.textContent = "Request submitted. It may appear as Review or Pending depending on moderation.";
           setTimeout(()=> location.href="/pin_dashboard/", 800);
         }catch(err){

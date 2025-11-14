@@ -65,7 +65,7 @@
   </main>
 
   <script>
-    // ---------- helpers ----------
+ 
     const qs = (sel, root=document) => root.querySelector(sel);
     const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
     const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
@@ -113,11 +113,13 @@
       `;
     }
 
+    
     // ---------- API calls ----------
     async function loadSuggestions(requestId){
       const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/suggest/`);
       renderSuggestions(data.suggestions || []);
     }
+
 
     async function setAssignmentPool(requestId, cvIds){
       const data = await fetchJSON(`/api/csr/match/${encodeURIComponent(requestId)}/assignment/`, {
@@ -137,13 +139,13 @@
         method:"POST",
         body: JSON.stringify({ timeout_minutes: timeoutMinutes })
       });
-      // After sending offers, refresh queue display (deadline etc.)
+      // After sending offers, refresh queue display
       renderQueue(data);
     }
 
     let autoRefreshHandle = null;
 
-    // ---------- page init ----------
+    
     async function initCSRMatchDetail(){
       const reqId = REQUEST_ID?.trim();
       if(!reqId){ location.href = "/csr_match/"; return; }
@@ -176,7 +178,7 @@
         try {
           await loadAssignmentPool(reqId);
         } catch (_) {
-          // ignore transient failures
+        
         }
       }, 15000);
     }

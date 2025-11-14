@@ -1,8 +1,5 @@
-# core/Control/csr_controllers.py
-"""
-CONTROLLER layer for CSR features.
-Coordinates entities, shapes data for delivery (dicts), and enforces app-level rules.
-"""
+# core/control/csr_controllers.py
+
 
 from __future__ import annotations
 from typing import Dict, Any, List
@@ -112,7 +109,7 @@ class CSRRequestController:
     @staticmethod
     def commit_request(csr: CSRRep, request_id: str) -> Dict[str, Any]:
         req = RequestEntity.commit(csr, request_id)
-        # Once committed, remove from this CSR's shortlist so UI updates cleanly
+        
         RequestEntity.remove_shortlist(csr, request_id)
         return {"id": req.id, "status": req.status}
 
@@ -220,7 +217,7 @@ class CSRMatchController:
 
     @staticmethod
     def suggest(request_id: str) -> Dict[str, Any]:
-        # Load request only once by Entity where necessary; here we use ORM directly for simplicity
+       
         from core.models import Request as _Req
         req = _Req.objects.select_related("pin").get(pk=request_id)
         suggestions = MatchEntity.suggest_top(req)
@@ -253,15 +250,18 @@ class CSRMatchController:
             }
         return CSRMatchController._serialize_queue(mq)
 
+
     @staticmethod
     def send_offers(request_id: str, timeout_minutes: int = 30) -> Dict[str, Any]:
         mq = MatchEntity.send_offers(request_id, timeout_minutes)
         return CSRMatchController._serialize_queue(mq)
 
+
     @staticmethod
     def cv_decision(request_id: str, cv_id: str, accepted: bool) -> Dict[str, Any]:
         req = MatchProgressEntity.record_cv_decision(request_id, cv_id, accepted)
         return {"request_id": req.id, "status": req.status, "cv": req.cv_id}
+
 
     @staticmethod
     def sweep_dormant() -> Dict[str, Any]:

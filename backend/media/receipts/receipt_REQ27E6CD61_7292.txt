@@ -1,0 +1,3 @@
+Receipt for request REQ27E6CD61
+Amount: $33.02
+Paid via paynow

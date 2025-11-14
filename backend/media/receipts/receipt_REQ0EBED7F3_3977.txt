@@ -1,0 +1,3 @@
+Receipt for request REQ0EBED7F3
+Amount: $5.17
+Paid via cash

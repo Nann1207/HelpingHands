@@ -24,6 +24,7 @@ def create_pin(*, user: AbstractUser, name: str, dob, phone: str, address: str,
     )
 
 
+
 @transaction.atomic
 def create_cv(*, user: AbstractUser, company: Company, name: str, dob, phone: str, address: str,
               gender: str, main_language: str, second_language: str = "",

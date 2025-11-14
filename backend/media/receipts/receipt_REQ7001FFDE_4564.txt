@@ -1,0 +1,3 @@
+Receipt for request REQ7001FFDE
+Amount: $25.11
+Paid via cash

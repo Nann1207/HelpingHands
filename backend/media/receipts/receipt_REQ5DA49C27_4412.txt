@@ -1,0 +1,3 @@
+Receipt for request REQ5DA49C27
+Amount: $6.24
+Paid via paynow

@@ -1,0 +1,3 @@
+Receipt for request REQADD1B101
+Amount: $52.93
+Paid via cash

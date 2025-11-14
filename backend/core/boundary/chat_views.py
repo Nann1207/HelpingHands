@@ -3,10 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.shortcuts import get_object_or_404
 
 from core.Control.chat_controller import ChatController
-from core.models import ChatRoom
 from .chat_serializers import (
     ChatRoomSerializer,
     ChatMessageSerializer,
@@ -36,16 +34,14 @@ class RequestChatView(APIView):
 
 
 
+
+    #GET  /api/chats/<chat_id>/messages/
+    #POST /api/chats/<chat_id>/messages/
 class ChatMessagesListCreate(APIView):
-    """
-    GET  /api/chats/<chat_id>/messages/
-    POST /api/chats/<chat_id>/messages/
-    """
 
     def get(self, request, chat_id):
-        chat = get_object_or_404(ChatRoom, pk=chat_id)
         try:
-            ChatController._ensure_cv_or_pin(request.user, chat.request)
+            chat = ChatController.get_chat(user=request.user, chat_id=chat_id)
         except PermissionDenied:
             return Response({"detail": "Not allowed."}, status=403)
 
@@ -76,7 +72,7 @@ class ChatMessagesListCreate(APIView):
 
 
 
-# 4) Mark request COMPLETE (and expire chat 24h after completion)
+# Mark request COMPLETE (and expire chat 24h after completion)
 class CompleteRequestView(APIView):
     """
     POST /api/requests/<req_id>/complete/

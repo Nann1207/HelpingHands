@@ -2,20 +2,14 @@
 from __future__ import annotations
 from datetime import timedelta
 from django.utils import timezone
-from django.shortcuts import get_object_or_404 #If object not found, return 404 error
+from django.shortcuts import get_object_or_404 
 from django.core.exceptions import PermissionDenied, ValidationError
-from core.models import Request, RequestStatus, ChatRoom
+from core.models import Request, ChatRoom
 from core.entity.chat_entity import ChatEntity
 
 class ChatController:
-    """
-    Business rules:
-    - Who can access a chat (CV or PIN attached to the Request)
-    - Ensure chat exists for a given request
-    - Set chat expiry when a request is completed (no signals)
-    """
 
-    #Prevents strangers (like other CVs or PAs) from accessing someone else’s chat.
+    #Ensure CV or PIN is associated with the request
     @staticmethod
     def _ensure_cv_or_pin(user, req: Request):
         ok = False
@@ -27,13 +21,19 @@ class ChatController:
             raise PermissionDenied("Not allowed.") #raises if not
 
 
-
     #Fetch the request by ID, 
     @staticmethod
     def get_or_create_for_request(*, user, req_id: str) -> ChatRoom:
         req = get_object_or_404(Request, pk=req_id)
         ChatController._ensure_cv_or_pin(user, req) #Make sure the user is allowed to access it
         return ChatEntity.get_or_create_for_request(req) #create the chat
+    
+    #Fetch a chat 
+    @staticmethod
+    def get_chat(*, user, chat_id: str) -> ChatRoom:
+        chat = ChatEntity.get_chat(chat_id)
+        ChatController._ensure_cv_or_pin(user, chat.request)
+        return chat
 
 
     #Detects if the current user is a CV or PIN and lists their chats accordingly
@@ -49,21 +49,16 @@ class ChatController:
     #Send a message in a chat
     @staticmethod
     def send_message(*, user, chat_id: str, body: str):
-        chat = get_object_or_404(ChatRoom, pk=chat_id) #Fetch chat by ID
-        ChatController._ensure_cv_or_pin(user, chat.request) #Check if the user belongs to cv or pin
+        chat = ChatController.get_chat(user=user, chat_id=chat_id) 
 
-        #If the chat has expired → block the message.
         if not chat.is_open:
             raise PermissionDenied("Chat is closed.")
-        
 
-        #not empty message body
         body = (body or "").strip()
         if not body:
             raise ValidationError("Message body cannot be empty.")
-        
-        #Save the message under this chat (chat.messages.create()).
-        return chat.messages.create(sender=user, body=body)
+
+        return ChatEntity.save_message(chat, sender=user, body=body)
 
 
 
@@ -71,33 +66,7 @@ class ChatController:
     #Close out a request and set chat expiry
     @staticmethod
     def complete_request(*, user, req_id: str):
-
-
-        #Get the request object
         req = get_object_or_404(Request, pk=req_id)
-
-       #Ensure CV or PIN is allowed to access this request
         ChatController._ensure_cv_or_pin(user, req)
+        return ChatEntity.complete_request(req)
 
-        #If the request is already complete, ensure the completed_at time exists.
-        if req.status == RequestStatus.COMPLETE:
-
-            completed_at = req.completed_at or timezone.now()
-            req.completed_at = completed_at
-            req.save(update_fields=["completed_at"]) 
-
-        else:
-            req.status = RequestStatus.COMPLETE
-            if not req.completed_at:
-                req.completed_at = timezone.now()
-            req.save(update_fields=["status", "completed_at"])
-
-        # Ensure chat exists 
-        chat = ChatEntity.get_or_create_for_request(req)
-        #Calculates the expiry time = completed_at + 24 hours.
-        desired_expiry = req.completed_at + timedelta(hours=24)
-        if chat.expires_at != desired_expiry:
-            chat.expires_at = desired_expiry
-            chat.save(update_fields=["expires_at"]) #Returns the updated request objec
-
-        return req

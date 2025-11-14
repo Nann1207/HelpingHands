@@ -1,0 +1,3 @@
+Receipt for request REQ2995DAB1
+Amount: $35.75
+Paid via paylah

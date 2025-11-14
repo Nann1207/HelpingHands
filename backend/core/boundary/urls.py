@@ -66,7 +66,7 @@ urlpatterns = [
     # GET /api/admin/reports/requests.csv
     path("admin/reports/requests.csv", AdminReportView.as_view(), name="admin-report-requests"),
 
-    # ----- PIN -----
+    # PIN
     path("pin/requests/",            PinRequestCreateView.as_view(),     name="pin-requests-create"),   
     path("pin/my/requests/",         PinMyRequestsView.as_view(),        name="pin-requests-list"),     
     path("pin/profile/otp/start/",   PinStartProfileUpdateView.as_view(), name="pin-profile-otp-start"),
@@ -77,7 +77,7 @@ urlpatterns = [
     path("pin/claims/<str:claim_id>/verify/",  PinVerifyClaimView.as_view(),  name="pin-claim-verify"),
     path("pin/claims/<str:claim_id>/dispute/", PinDisputeClaimView.as_view(), name="pin-claim-dispute"),
 
-    # ----- CV -----
+    # CV
     path("cv/dashboard/",                        CvDashboardView.as_view(),     name="cv-dashboard"),
     path("cv/requests/",                         CvMyRequestsView.as_view(),    name="cv-requests-list"),
     path("cv/requests/<str:req_id>/",            CvRequestDetailView.as_view(), name="cv-request-detail"),
@@ -87,7 +87,7 @@ urlpatterns = [
     path("cv/requests/<str:req_id>/claims/",     CvCreateClaimView.as_view(),   name="cv-request-claims"),
     path("cv/claims/",                           CvMyClaimsView.as_view(),      name="cv-claims"),
 
-    # ----- Chat -----
+    # Chat
     path("me/chats/",                    MyChatsView.as_view(),            name="me-chats"),
     path("requests/<str:req_id>/chat/",  RequestChatView.as_view(),        name="request-chat"),
     path("chats/<str:chat_id>/messages/", ChatMessagesListCreate.as_view(), name="chat-messages"),

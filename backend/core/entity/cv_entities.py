@@ -1,4 +1,7 @@
 from __future__ import annotations
+from datetime import date
+from typing import Dict, Any
+
 from django.db import transaction
 from django.db.models import Q, F
 from django.utils import timezone
@@ -9,19 +12,13 @@ from core.models import (
 )
 
 class CvEntity:
-    """
-    DB-only for CV use-cases.
-    """
 
-    # ---------- DASHBOARD LISTS ----------
+
+    
 
     @staticmethod
     def list_pending_offers(*, cv_id: str):
-        """
-        Offers that are currently ACTIVE for this CV from the match queue.
-        Auto-removal happens naturally when MatchQueue advances/expires;
-        this list only shows offers where this CV is the current slot.
-        """
+
         now = timezone.now()
         return (
             Request.objects
@@ -38,9 +35,7 @@ class CvEntity:
 
     @staticmethod
     def list_active_sorted(*, cv_id: str):
-        """
-        Accepted requests (ACTIVE), sorted by upcoming appointment first.
-        """
+
         return (
             Request.objects.filter(cv_id=cv_id, status=RequestStatus.ACTIVE)
             .select_related("pin", "cv")
@@ -62,7 +57,46 @@ class CvEntity:
             .order_by("-created_at")
         )
 
-    # ---------- CLAIMS ----------
+    @staticmethod
+    def promptinfo(*, req_id: str) -> Dict[str, Any]:
+
+        req = (
+            Request.objects
+            .select_related("pin", "match_queue")
+            .get(pk=req_id)
+        )
+        pin = req.pin
+        age = None
+        if pin and pin.dob:
+            today = date.today()
+            age = today.year - pin.dob.year - (
+                (today.month, today.day) < (pin.dob.month, pin.dob.day)
+            )
+        prompt = {
+            "task": "risk_safety_guidance",
+            "inputs": {
+                "age": age,
+                "gender": getattr(pin, "preferred_cv_gender", None),
+                "category": req.service_type,
+                "description": req.description,
+                "locations": {
+                    "pickup": req.pickup_location,
+                    "service": req.service_location,
+                },
+            },
+            "constraints": {
+                "tone": "calm, practical, concise",
+                "max_items": 6,
+            },
+        }
+        return {
+            "request": req,
+            "pin": pin,
+            "age": age,
+            "prompt": prompt,
+        }
+
+    # --- CLAIMS ---
 
     @staticmethod
     @transaction.atomic

@@ -1,28 +1,21 @@
-# core/Boundary/serializers_csr.py
-"""
-Serializers for CSR  features.
-Used by csr_views to read/write Request, Shortlist, MatchQueue, Claim, and Notification data.
-"""
+# core/boundary/serializers_csr.py
+
 
 from rest_framework import serializers
 from core.models import ShortlistedRequest, Notification, MatchQueue, ClaimReport, CV
 
 
-# ---------- BASIC READ MODELS ----------
+
 
 class _SafeDict(dict):
-    """Return None for missing keys so DRF fields treat them as empty."""
+
 
     def __missing__(self, key):
         return None
 
 
 class RequestListSerializer(serializers.Serializer):
-    """
-    Lightweight serializer that mirrors the dict payloads returned by CSR controllers.
-    Only `id` is required; every other field is optional because different UI
-    widgets render different subsets of data.
-    """
+
 
     id = serializers.CharField()
     service_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)

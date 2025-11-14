@@ -1,0 +1,3 @@
+Receipt for request REQ3089FEE6
+Amount: $78.42
+Paid via paynow

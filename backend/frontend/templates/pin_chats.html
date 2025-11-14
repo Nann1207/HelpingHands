@@ -64,16 +64,14 @@
       throw new Error(`Element not found for selector: ${selector}`);
     }
 
-    /* ============== Small helpers (UI only — NOT Boundary) ============== */
+ 
     function getCookie(name){
       const v = `; ${document.cookie}`;
       const p = v.split(`; ${name}=`);
       if (p.length === 2) return p.pop().split(';').shift();
     }
 
-    /* ==============================
-     * BOUNDARY FUNCTION: j(u, o)
-     * ============================== */
+
     async function j(u,o){
       const r = await fetch(u,{ credentials:"include", ...(o||{}) });
       if(!r.ok){
@@ -85,9 +83,7 @@
       return r.json();
     }
 
-    /*
-        wires UI to Boundary calls
-     * ============================ */
+  
     (async () => {
 
       const chatList   = await $qs("#chatList");
@@ -113,8 +109,8 @@
        *  BOUNDARY FUNCTION: loadChats()
        * =============================================================== */
       async function loadChats(){
-        const open   = await j("/api/me/chats/?status=open");   // Boundary
-        const closed = await j("/api/me/chats/?status=closed"); // Boundary
+        const open   = await j("/api/me/chats/?status=open");   
+        const closed = await j("/api/me/chats/?status=closed"); 
 
         chatList.innerHTML = `
           <div class="px-3 py-1 text-xs uppercase text-gray-500">Open</div>
@@ -123,15 +119,15 @@
           ${(closed||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No past chats</div>'}
         `;
 
-        // CONTROLLER: wire list → openChat (Boundary)
+ 
         chatList.querySelectorAll("button[data-id]").forEach(b=>{
           b.addEventListener("click", ()=> openChat(b.getAttribute("data-id")));
         });
 
-        // Optional autoselect if ?open=<id>
+
         const url = new URL(location.href);
         const openId = url.searchParams.get("open");
-        if (openId) openChat(openId); // Boundary
+        if (openId) openChat(openId); 
       }
 
       /* ==================================
@@ -140,7 +136,7 @@
       async function openChat(id){
         activeChatId = id;
         chatHeader.textContent = `Chat ${id}`;
-        const msgs = await j(`/api/chats/${id}/messages/`); // Boundary
+        const msgs = await j(`/api/chats/${id}/messages/`); 
         messages.innerHTML = (msgs||[]).map(m => `
           <div class="text-sm">
             <div class="text-[11px] text-gray-500">${m.sender} · ${m.created_at?.replace("T"," ").slice(0,16)}</div>
@@ -170,7 +166,7 @@
             body: JSON.stringify({ body })
           });
           msgInput.value = "";
-          // Boundary: reload thread after send
+
           await openChat(activeChatId);
         }catch(err){
           alert("Failed to send (maybe chat closed).");
@@ -179,12 +175,12 @@
       });
 
       
-      await loadChats(); // Boundary
+      await loadChats(); 
 
       
       window.addEventListener("popstate", async () => {
         const openId = new URL(location.href).searchParams.get("open");
-        if (openId) openChat(openId); // Boundary
+        if (openId) openChat(openId); 
       });
     })();
   </script>

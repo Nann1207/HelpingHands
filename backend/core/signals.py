@@ -5,10 +5,7 @@ from core.models import FlaggedRequest, Request, RequestStatus
 
 @receiver(post_save, sender=FlaggedRequest)
 def move_request_to_review_on_open_flag(sender, instance: FlaggedRequest, created, **kwargs):
-    """
-    if a request has any OPEN flag, the Request.status must be REVIEW.
-    Triggered on every flag save. If the flag is open (resolved=False), push request to REVIEW.
-    """
+
     if not instance.resolved:
         req_id = instance.request_id
         # Update directly to avoid extra selects; only change if not already REVIEW

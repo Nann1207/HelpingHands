@@ -1,0 +1,3 @@
+Receipt for request REQDF321C1B
+Amount: $12.25
+Paid via card

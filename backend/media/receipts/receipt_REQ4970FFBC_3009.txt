@@ -1,0 +1,3 @@
+Receipt for request REQ4970FFBC
+Amount: $78.03
+Paid via paylah

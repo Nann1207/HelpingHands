@@ -27,7 +27,7 @@ from core.boundary.csr_serializers import (
 )
 
 
-# ---- Permissions -------------------------------------------------------------
+# --- Permissions ---
 
 class IsCSRRep:
     def has_permission(self, request, view):
@@ -38,7 +38,7 @@ def _csr(request) -> CSRRep:
     return request.user.csrrep
 
 
-# ---- Response serializers (UI-shaped) ---------------------------------------
+# --- Response serializers  ---
 
 class ComingSoonResponseSerializer(serializers.Serializer):
     coming_soon = RequestListSerializer(many=True)
@@ -52,7 +52,6 @@ class DashboardResponseSerializer(serializers.Serializer):
 
 
 class _SafeShortlistRow(dict):
-    """Gracefully return None for missing keys when serializing shortlist rows."""
 
     def __missing__(self, key):
         return None
@@ -96,7 +95,7 @@ class CSRFlagSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
-# ---- 1) Dashboard ------------------------------------------------------------
+# --- 1) Dashboard ---
 
 class CSRDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
@@ -104,10 +103,10 @@ class CSRDashboardView(APIView):
 
     def get(self, request):
         data = CSRDashboardController.get_dashboard(_csr(request))
-        return Response(DashboardResponseSerializer(data).data, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
 
-# ---- 2) Requests Pool --------------------------------------------------------
+# --- 2) Requests Pool ---
 
 
 class CSRRequestPoolView(APIView):
@@ -149,7 +148,7 @@ class CSRShortlistToggleView(APIView):
         ser = ShortlistCreateSerializer(data={"request": request_id}, context={"csr": csr})
         ser.is_valid(raise_exception=True)
         data = CSRRequestController.shortlist_add(csr, request_id)
-        # shape to ShortlistItemSerializer-like row for your HTML table
+        
         row = {
             "shortlist_id": data["id"],
             "request_id": data["request_id"],
@@ -175,7 +174,7 @@ class CSRCommitFromPoolView(APIView):
         return Response(CommitResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
-# ---- 3) Shortlist Page -------------------------------------------------------
+# --- 3) Shortlist Page ---
 
 class CSRShortlistView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
@@ -186,20 +185,22 @@ class CSRShortlistView(APIView):
         return Response({"items": items}, status=status.HTTP_200_OK)
 
 
-# ---- 4) Commit Page ----------------------------------------------------------
+# --- 4) Commit Page ---
 
 class CSRCommitListView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
     def get(self, request):
         data = CSRCommitController.list(_csr(request))
-        # Controller returns {"items": [...]} where each is request-like
+        
         items = RequestListSerializer(data["items"], many=True).data
         return Response({"items": items}, status=status.HTTP_200_OK)
 
 
-# ---- 5) Match Details --------------------------------------------------------
+# --- 5) Match Details ---
 
+
+#THIS IS THE API
 class CSRMatchSuggestView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
@@ -209,15 +210,19 @@ class CSRMatchSuggestView(APIView):
         return Response({"suggestions": suggestions}, status=status.HTTP_200_OK)
 
 
+
+
 class CSRMatchAssignmentPoolView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
     class _Payload(serializers.Serializer):
         cv_ids = serializers.ListField(child=serializers.CharField(), min_length=1, max_length=3)
 
+
     def get(self, request, request_id: str):
         data = CSRMatchController.get_assignment_pool(request_id)
         return Response(data, status=status.HTTP_200_OK)
+
 
     def post(self, request, request_id: str):
         payload = self._Payload(data=request.data)
@@ -265,7 +270,7 @@ class CSRNotificationsView(APIView):
 
     def get(self, request):
         data = CSRNotificationController.list(request.user)  # {"items":[...]}
-        return Response(NotificationSerializer(data["items"], many=True).data, status=status.HTTP_200_OK)
+        return Response(data["items"], status=status.HTTP_200_OK)
 
 
 # ---- 7) Completed Requests & Claims -----------------------------------------
@@ -286,10 +291,6 @@ class CSRCompletedClaimsView(APIView):
 
         serializer = ClaimReportSerializer(claims, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
-
 
 
 

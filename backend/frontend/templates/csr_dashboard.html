@@ -72,7 +72,7 @@
       </div>
     </section>
 
-    <!-- Notifications -->
+    <!-- Notifications panel -->
     <section class="p-4 rounded-xl bg-white border">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold">Notifications</h2>
@@ -83,7 +83,7 @@
   </main>
 
   <script>
-    // ---------- helpers ----------
+    
     const qs = (sel, root=document) => root.querySelector(sel);
     const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
     const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
@@ -100,7 +100,7 @@
       return resp.json();
     }
 
-    const DASHBOARD_REFRESH_MS = 15000; // 15s auto-refresh for dashboard + notifications
+    const DASHBOARD_REFRESH_MS = 15000; // 15s auto refresh for dashboard and notifications
     let dashboardTimer = null;
 
     const formatTime = (value) => {
@@ -151,6 +151,10 @@
       `).join("");
     }
 
+
+    // this is to render notifications fetched from the API will be used in loadCSRNotifications()
+    // adds each notification as a list item in the notifications section like a row 
+    //basically for the notifications section in the dashboard
     function renderNotifications(items){
       const list = qs('[data-list="notifications"]');
       list.innerHTML = items.map(n => `
@@ -159,7 +163,7 @@
             <div class="text-sm font-medium">${n.type.replaceAll("_"," ").toUpperCase()}</div>
             <div class="text-sm text-gray-700">${n.message}</div>
           </div>
-          <div class="text-xs text-gray-400">${new Date(n.created_at).toLocaleString()}</div>
+          <div class="text-xs text-gray-400">${new Date(n.created_at).toLocaleString()}</div> 
         </li>
       `).join("");
       qs("#apiLabel").style.display = "none";
@@ -171,12 +175,15 @@
       renderCommitted(data.committed || []);
     }
 
+
+    // load notifications, basically for the notifications section in the dashboard
     async function loadCSRNotifications(){
       const data = await fetchJSON("/api/csr/notifications/");
       const items = Array.isArray(data) ? data : data.items || [];
       renderNotifications(items);
     }
 
+    
     function startDashboardAutoRefresh(){
       if (dashboardTimer) clearInterval(dashboardTimer);
       dashboardTimer = setInterval(() => {
@@ -199,27 +206,29 @@
       startDashboardAutoRefresh();
     });
 
-    // ---- Desktop notifications (in-tab polling) ------------------------------
+   
 
     const Notifs = {
         enabled: false,
-        lastSeenId: 0,                 // we’ll store the largest notification id we’ve shown
-        pollMs: 30000,                 // 30s
+        lastSeenId: 0,                 
+        pollMs: 30000,                
         timer: null
       };
 
-      // Request browser permission because it must be user-initiated
+      // Request browser permission for desktop notifications
       async function requestDesktopPermission() {
         if (!("Notification" in window)) {
           alert("Notifications not supported in this browser.");
           return false;
         }
-        // If page is served over http://localhost it works; in production use HTTPS.
+        
         if (Notification.permission === "granted") return true;
         if (Notification.permission === "denied") {
-          alert("You previously blocked notifications. Please enable them in browser settings.");
+          alert("You previously blocked notifications. Please enable them in browser settings."); // If denied inform us to change setting
           return false;
         }
+
+        //Ask the browser for permission to show desktop notifications and wait until the user chooses allow block
         const perm = await Notification.requestPermission();
         return perm === "granted";
       }
@@ -228,38 +237,51 @@
         try {
           const n = new Notification(title, {
             body,
-            tag,                 // same tag prevents stacking duplicates
-            icon: "/static/favicon.ico" // optional
-            // requireInteraction: true, // keep on screen until clicked (optional)
+            tag,                
+            icon: "/static/favicon.ico" 
+           
           });
           n.onclick = (evt) => {
             window.focus();
-            // If you want to navigate to a specific page:
-            // if (data?.request_id) location.href = `/csr_match/?request=${data.request_id}`;
+            
             n.close();
           };
         } catch (e) {
-          // Fallback if notifications aren’t available (e.g., denied)
+         
           console.warn("Notification failed:", e);
         }
       }
 
-      // Fetch new CSR notifications and toast them
+     
       async function pollCSRNotifications() {
         if (!Notifs.enabled) return;
 
         try {
-          const resp = await fetch("/api/csr/notifications/", { credentials: "include", cache: "no-store" });
+          const resp = await fetch("/api/csr/notifications/", {
+            credentials: "include",
+            cache: "no-store"
+          });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const items = await resp.json(); // boundary returns an array of notification rows
-          if (!Array.isArray(items)) return;
 
-          // Sort by id just in case, and emit only > lastSeenId
-          items.sort((a,b) => (a.id||0) - (b.id||0));
+          
+          const raw = await resp.json();
+          const items = Array.isArray(raw) ? raw : (raw.items || []);
+          if (!items.length) return;
+
+          // sort by id (oldest to newest)
+          items.sort((a, b) => (a.id || 0) - (b.id || 0));
+          const newestId = items[items.length - 1].id || 0;
+
+          // First run after enabling alerts
+          // just record the latest id so we don't popup alld of old notifications
+          if (!Notifs.lastSeenId && newestId) {
+            Notifs.lastSeenId = newestId;
+            return;
+          }
+
+          // Only notifications that are newer than what i have  seen
           const fresh = items.filter(n => (n.id || 0) > (Notifs.lastSeenId || 0));
-
-          // If first run and you don’t want to blast history
-          // if (Notifs.lastSeenId === 0) fresh.length = 0;
+          if (!fresh.length) return;
 
           for (const n of fresh) {
             const title = ({
@@ -272,6 +294,7 @@
             })[n.type] || "Update";
 
             const body = n.message || "New update.";
+
             showBrowserNotification({
               title,
               body,
@@ -279,6 +302,7 @@
               data: { request_id: n.request_id, cv_id: n.cv_id }
             });
 
+            // move the "last seen" marker forward
             if ((n.id || 0) > (Notifs.lastSeenId || 0)) {
               Notifs.lastSeenId = n.id;
             }
@@ -288,19 +312,20 @@
         }
       }
 
+
       function startNotificationPolling() {
         if (Notifs.timer) clearInterval(Notifs.timer);
         Notifs.timer = setInterval(pollCSRNotifications, Notifs.pollMs);
-        // also do an immediate poll
+
         pollCSRNotifications();
       }
 
-      // Wire up the button
+
       document.addEventListener("DOMContentLoaded", () => {
         const btn = document.getElementById("enableDesktopAlerts");
         if (!btn) return;
 
-        // show current state
+
         function refreshBtn() {
           btn.textContent = Notifs.enabled ? "Desktop alerts ON" : "Enable alerts";
           btn.classList.toggle("bg-gray-900", Notifs.enabled);
@@ -323,7 +348,8 @@
         });
       });
 
-      // Optional: also poll when the tab becomes visible again
+
+      // Refresh dashboard and notifications when tab becomes visible
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
           loadCSRDashboard().catch(err => console.warn("Dashboard refresh failed:", err));

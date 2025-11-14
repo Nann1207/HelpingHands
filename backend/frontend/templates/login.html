@@ -9,7 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
-  <!-- Header (same vibe as landing) -->
+
+  <!-- Header -->
   <header class="border-b border-gray-200 backdrop-blur-sm bg-white/80 sticky top-0 z-50 shadow-sm">
     <div class="container mx-auto px-4 py-4 flex items-center justify-between">
       <a href="/" class="flex items-center gap-2" aria-label="Helping Hands home">
@@ -176,7 +177,7 @@
     </div>
   </footer>
 
-  <!-- JS: tabs and role/company fields -->
+
   <script>
     (function () {
       const tabLogin = document.getElementById('tab-login');
@@ -201,7 +202,7 @@
       tabLogin.addEventListener('click', () => activate('login'));
       tabSignup.addEventListener('click', () => activate('signup'));
 
-      // role -> company fields
+      // role company fields
       const roleSel = document.getElementById('role');
       const companyFields = document.getElementById('company-fields');
 
@@ -211,9 +212,9 @@
         companyFields.classList.toggle('hidden', !show);
       }
       roleSel.addEventListener('change', updateCompanyVisibility);
-      updateCompanyVisibility(); // initial
+      updateCompanyVisibility(); 
 
-      // if URL has ?role=CV etc, preselect
+
       const params = new URLSearchParams(window.location.search);
       const preRole = params.get('role');
       if (preRole) {

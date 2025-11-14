@@ -1,11 +1,10 @@
 from __future__ import annotations
 import json
-import logging
-from datetime import date
 from typing import Dict, Any
 
 
 from django.conf import settings
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied, ValidationError
 
@@ -15,25 +14,15 @@ except ImportError:
     requests = None
 
 
-logger = logging.getLogger(__name__)
-
 from core.models import Request, RequestStatus, CV, MatchQueueStatus
 from core.entity.cv_entities import CvEntity
 from core.Control.chat_controller import ChatController  
 from core.Control.csr_controller import CSRMatchController  
 
 class CvController:
-    """
-    - Dashboard sections (Pending offers / Active / Completed)
-    - Accept / Decline offer
-    - List Active/Completed requests
-    - Request details (click-through)
-    - Complete a request (delegates to ChatController)
-    - Safety tips (Sea Lion Llama API with graceful fallback)
-    - Submit & list claims
-    """
 
-    # ---------- guards ----------
+
+    # ---guards ---
     @staticmethod
     def _ensure_is_cv(user) -> CV:
         if not hasattr(user, "cv"):
@@ -51,7 +40,7 @@ class CvController:
             or (mq.current_index == 3 and mq.cv3queue_id == cv_id)
         )
 
-    # ---------- dashboard ----------
+    # ---- dashboard ---
 
     @staticmethod
     def dashboard(*, user) -> Dict[str, Any]:
@@ -61,7 +50,7 @@ class CvController:
         completed = CvEntity.list_completed(cv_id=cv.id)
         return {"pending": pending, "active": active, "completed": completed}
 
-    # ---------- lists & detail ----------
+    # --- lists & detail ---
     @staticmethod
     def list_requests(*, user, status: str):
         cv = CvController._ensure_is_cv(user)
@@ -79,7 +68,7 @@ class CvController:
             raise PermissionDenied("Not your request.")
         return req
 
-    # ---------- offer decisions ----------
+    # --- offer decisions ---
     
     @staticmethod
     def decide_offer(*, user, req_id: str, accepted: bool):
@@ -88,45 +77,26 @@ class CvController:
         data = CSRMatchController.cv_decision(request_id=req_id, cv_id=cv.id, accepted=accepted)
         return data
 
-    # ---------- completion ----------
+    # --- completion ---
 
     @staticmethod
     def complete_request(*, user, req_id: str):
         return ChatController.complete_request(user=user, req_id=req_id)
 
-    # ---------- safety tips ----------
-
+    # --- safety tips ---
     @staticmethod
     def safety_tips(*, user, req_id: str) -> dict:
         cv = CvController._ensure_is_cv(user)
-        req = get_object_or_404(Request.objects.select_related("pin", "match_queue"), pk=req_id)
+        try:
+            payload = CvEntity.promptinfo(req_id=req_id)
+        except Request.DoesNotExist:
+            raise Http404("Request not found.")
+        req = payload["request"]
+        pin = payload["pin"]
+        age = payload["age"]
+        prompt = payload["prompt"]
         if req.cv_id != cv.id and not CvController._has_pending_offer(req, cv.id):
             raise PermissionDenied("Not your request.")
-
-        # Prepare input
-        pin = req.pin
-        age = None
-        if pin.dob:
-            today = date.today()
-            age = today.year - pin.dob.year - ((today.month, today.day) < (pin.dob.month, pin.dob.day))
-
-        prompt = {
-            "task": "risk_safety_guidance",
-            "inputs": {
-                "age": age,
-                "gender": pin.preferred_cv_gender,
-                "category": req.service_type,
-                "description": req.description,
-                "locations": {
-                    "pickup": req.pickup_location,
-                    "service": req.service_location
-                }
-            },
-            "constraints": {
-                "tone": "calm, practical, concise",
-                "max_items": 6
-            }
-        }
 
         api_key = getattr(settings, "SEA_LION_LLAMA_API_KEY", None)
         endpoint = getattr(settings, "SEA_LION_LLAMA_ENDPOINT", "https://api.sea-lion.ai/v1/chat/completions")
@@ -177,21 +147,14 @@ class CvController:
                 resp.raise_for_status()
                 parsed = CvController._parse_llm_tips(resp.json())
                 if parsed:
-                    logger.info("Sea Lion safety tips generated for request %s via %s", req.id, endpoint)
                     return {"request_id": req.id, "tips": parsed}
-            except (requests.RequestException, ValueError, KeyError) as exc:
-                logger.warning("Sea Lion safety tips fetch failed for request %s: %s", req.id, exc)
-        elif api_key and not requests:
-            logger.warning("Sea Lion API key configured but 'requests' not installed; using fallback tips.")
-        else:
-            logger.info("Sea Lion API not configured; using fallback tips.")
+            except (requests.RequestException, ValueError, KeyError):
+                pass
 
         tips = CvController._fallback_tips(req=req, age=age, pin=pin)
-        logger.info("Fallback safety tips returned for request %s", req.id)
         return {"request_id": req.id, "tips": tips}
 
-    # ---------- claims ----------
-
+    # --- claims ---
     @staticmethod
     def report_claim(*, user, req_id: str, **payload):
         cv = CvController._ensure_is_cv(user)
@@ -206,8 +169,7 @@ class CvController:
         cv = CvController._ensure_is_cv(user)
         return CvEntity.list_my_claims(cv_id=cv.id)
 
-    # ---------- helpers ----------
-
+    
     @staticmethod
     def _parse_llm_tips(payload):
         if not isinstance(payload, dict):
@@ -259,6 +221,7 @@ class CvController:
         if pin and getattr(pin, "preferred_cv_gender", "") == "female":
             tips.append("Prioritize well-lit, public meeting points for the person-in-need when possible.")
         return tips
+
 
 
 class CvClaimController:

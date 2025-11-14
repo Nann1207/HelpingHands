@@ -1,8 +1,6 @@
 # core/entity/csr_entity.py
 """
-ENTITY layer (aka repositories/services) for CSR features.
-Only ORM/database logic lives here (no HTTP, no DRF objects).
-Safe to unit test directly.
+ENTITY LAYER
 """
 
 from __future__ import annotations
@@ -24,23 +22,18 @@ from core.models import (
 class DashboardEntity:
     @staticmethod
     def today_active_requests(csr: CSRRep) -> QuerySet:
-        """
-        Active requests whose appointment date is today, belonging to CSR's company (if applicable).
-        """
+
         today = timezone.localdate()
         qs = Request.objects.filter(
             status=RequestStatus.ACTIVE,
             appointment_date=today,
         ).select_related("pin", "cv")
-        # If CSR should only see his company’s CV-assigned requests, filter by CV.company
-        # return qs.filter(cv__company=csr.company) if needed
+        
         return qs
 
     @staticmethod
     def committed_requests(csr: CSRRep) -> QuerySet:
-        """
-        All requests this CSR has committed to (any status).
-        """
+
         return Request.objects.filter(
             committed_by_csr=csr
         ).select_related("pin", "cv")
@@ -59,10 +52,7 @@ class RequestEntity:
 
     @staticmethod
     def available_requests() -> QuerySet:
-        """
-        Pool shown on Request Page (PENDING only).
-        Includes shortlist count via annotation.
-        """
+  
         return (
             Request.objects.filter(status=RequestStatus.PENDING)
             .select_related("pin")
@@ -72,9 +62,7 @@ class RequestEntity:
 
     @staticmethod
     def coming_soon(days: int = 7) -> QuerySet:
-        """
-        PENDING requests with near appointment dates (next `days`).
-        """
+ 
         today = timezone.localdate()
         return (
             Request.objects.filter(
@@ -103,10 +91,7 @@ class RequestEntity:
     @staticmethod
     @transaction.atomic
     def commit(csr: CSRRep, request_id: str) -> Request:
-        """
-        Commit = move from PENDING → COMMITTED and stamp committer/ts.
-        Relies on model CheckConstraints to enforce integrity.
-        """
+  
         req = Request.objects.select_for_update().get(pk=request_id)
         if req.status != RequestStatus.PENDING:
             raise ValueError("Only PENDING requests can be committed.")
@@ -138,7 +123,7 @@ class CommitEntity:
         ).select_related("pin")
 
 
-# ---------- Matching (Auto-suggest & Assignment Pool) ----------
+# --- Matching (Auto-suggest & Assignment Pool) ---
 
 @dataclass
 class Suggestion:
@@ -150,10 +135,6 @@ class Suggestion:
 class MatchEntity:
     @staticmethod
     def _score_cv_for_request(req: Request, cv: CV) -> Tuple[float, Dict[str, Any]]:
-        """
-        Compute a simple match score using category + preferences (gender/language).
-        Expand as needed (distance, historical performance, etc.).
-        """
         score = 0.0
         reasons = {}
 
@@ -161,6 +142,7 @@ class MatchEntity:
         if cv.service_category_preference == req.service_type:
             score += 3.0
             reasons["category"] = True
+
 
         # PIN preferences
         pin: PersonInNeed = req.pin
@@ -174,7 +156,7 @@ class MatchEntity:
             score += 1.0
             reasons["language_second"] = True
 
-        # Sooner appointments = prioritise available CVs (placeholder +1)
+        
         score += 1.0
 
         return score, reasons
@@ -194,7 +176,7 @@ class MatchEntity:
     @transaction.atomic
     def set_assignment_pool(request_id: str, cv_ids: List[str]) -> MatchQueue:
         """
-        Select up to 3 CVs in order; create or update the MatchQueue.
+        Select up to 3 CVs in order
         """
         if not (1 <= len(cv_ids) <= 3):
             raise ValueError("You must pick 1 to 3 CVs.")
@@ -245,9 +227,7 @@ class MatchEntity:
     @staticmethod
     @transaction.atomic
     def send_offers(request_id: str, timeout_minutes: int = 30) -> MatchQueue:
-        """
-        Start the offer sequence — send to CV#1 (ACTIVE). Notifications recorded here.
-        """
+   
         req = Request.objects.select_for_update().get(pk=request_id)
         mq = MatchQueue.objects.select_for_update().get(request=req)
 
@@ -257,9 +237,9 @@ class MatchEntity:
         mq.deadline = mq.sent_at + timezone.timedelta(minutes=timeout_minutes)
         mq.save(update_fields=["status", "sent_at", "deadline"])
 
-        # Notify CSR user (recipient = CSRRep.user) and optionally the CV (if your app supports it)
+        # Notify CSR user 
         Notification.objects.create(
-            recipient=req.committed_by_csr.user,  # CSR account user
+            recipient=req.committed_by_csr.user, 
             type=NotificationType.OFFER_SENT,
             message=f"Offer sent to CV #{mq.current_index} for {req.id}",
             request=req,
@@ -295,7 +275,7 @@ class MatchProgressEntity:
             raise ValueError("Invalid CV decision state.")
 
         if accepted:
-            # Create the match
+            
             req.cv = current_cv
             req.status = RequestStatus.ACTIVE
             req.save(update_fields=["cv", "status", "updated_at"])
@@ -312,7 +292,7 @@ class MatchProgressEntity:
             )
             return req
 
-        # Declined — advance
+        
         Notification.objects.create(
             recipient=req.committed_by_csr.user,
             type=NotificationType.OFFER_DECLINED,
@@ -324,7 +304,7 @@ class MatchProgressEntity:
 
     @staticmethod
     def _advance_queue(req: Request, mq: MatchQueue) -> Request:
-        # Advance to next index or exhaust
+        
         nxt = mq.current_index + 1
         next_cv = None
         if nxt == 2:
@@ -356,7 +336,7 @@ class MatchProgressEntity:
                 message=f"No match found from queue for {req.id}.",
                 request=req,
             )
-            # Optionally: revert request to COMMITTED (still in CSR pool)
+            
             req.status = RequestStatus.COMMITTED
             req.cv = None
             req.save(update_fields=["status", "cv", "updated_at"])
@@ -366,10 +346,7 @@ class MatchProgressEntity:
     @staticmethod
     @transaction.atomic
     def auto_advance_dormant(now=None) -> int:
-        """
-        Called by a periodic job. Moves expired ACTIVE queues to next CV.
-        Returns number of advanced queues.
-        """
+    
         now = now or timezone.now()
         qs = MatchQueue.objects.select_for_update().filter(
             status=MatchQueueStatus.ACTIVE,
@@ -411,7 +388,7 @@ class MatchProgressEntity:
         return mq
 
 
-# ---------- Notifications ----------
+# ---- Notifications -----
 
 class NotificationEntity:
     @staticmethod
@@ -419,14 +396,12 @@ class NotificationEntity:
         return Notification.objects.filter(recipient=user).select_related("request", "cv").order_by("-created_at")
 
 
-# ---------- Completed & Claims ----------
+# ---- Completed & Claims -----
 
 class CompletedRequestsEntity:
     @staticmethod
     def list_completed(csr: CSRRep) -> QuerySet:
-        """
-        Completed requests (optionally scoped by company).
-        """
+
         return Request.objects.filter(
             status=RequestStatus.COMPLETE,
             claims__isnull=False,

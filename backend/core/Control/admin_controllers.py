@@ -22,7 +22,6 @@ from core.entity.admin_entities import (
 
 TRACKED_REQUEST_STATUSES = ("review", "pending", "rejected", "active", "complete")
 
-
 class AdminMetricsController:
 
     #To get the metrics for the dashboard
@@ -34,10 +33,12 @@ class AdminMetricsController:
         trunc_fn, fmt = truncator(granularity) #Get the truncation function and format based on granularity (year, month, day)
         dr = DateRange.from_strings(date_from, date_to) #Create a date range object from the provided date strings
 
+
         #Uses all 3 entities
         totals_profiles = ProfileEntity.totals()                      
         req_counts      = RequestEntity.count_by_status()             
         flag_counts     = FlagEntity.counts()                        
+
 
         cards = {
             #Requests by status
@@ -56,6 +57,7 @@ class AdminMetricsController:
             "Number of CV":  totals_profiles.get("total_cvs", 0),
             "Number of CSR": totals_profiles.get("total_csrs", 0),
         }
+
 
         #Charts
         #Requests by status
@@ -91,11 +93,12 @@ class AdminMetricsController:
 
 
 
-
 class AdminFlagController:
+
     @staticmethod
     def list_flags(*, resolved=None, flag_type=None, date_from=None, date_to=None):
         return FlagEntity.filtered(resolved=resolved, flag_type=flag_type, date_from=date_from, date_to=date_to) 
+
 
     @staticmethod
     def accept_flag(*, flag_id: int, pa_user, notes: str = ""):
@@ -109,6 +112,7 @@ class AdminFlagController:
 
 
 class AdminReportController:
+    
     @staticmethod
     def export_requests_csv(*, date_from: Optional[str] = None, #Export stats into a csv file
                             date_to: Optional[str] = None) -> Tuple[str, bytes]:

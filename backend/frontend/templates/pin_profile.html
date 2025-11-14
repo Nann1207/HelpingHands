@@ -49,7 +49,7 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <!-- UI button; handler below calls Boundary -->
+  
       <button id="sendOtp" type="button" onclick="sendOtp()" class="px-3 py-1.5 rounded-md border hover:bg-gray-100">Send OTP</button>
       <input id="otpCode" maxlength="6" placeholder="Enter OTP" class="border rounded-md px-3 py-1.5 w-32" />
       <button id="saveProfile" type="button" class="px-3 py-1.5 rounded-md bg-gray-900 text-white">Save Changes</button>
@@ -93,9 +93,7 @@
   }
   const csrftoken = getCookie('csrftoken');
 
-  /* ====================
-     ERROR MESSAGE  
-     -------------------- */
+
   function pickErrorMessage(payload, fallback){
     if (!payload || typeof payload !== "object") return fallback;
     if (typeof payload.detail === "string") return payload.detail;
@@ -117,18 +115,14 @@
     return fallback;
   }
 
-  /* ========================
-     fetchJSON — BOUNDARY
-     --------------------------*/
+
   async function fetchJSON(url){
     const r = await fetch(url, { credentials:"include" });
     if (!r.ok) throw new Error("HTTP "+r.status);
     return r.json();
   }
 
-  /* ==================================
-     postJSON —  BOUNDARY 
-     ----------------------- */
+
   async function postJSON(url, body){
     try{
       const resp = await fetch(url, {
@@ -161,9 +155,7 @@
       }
     }
 
-    /* ----------------------------
-       Boundary for Profile OTP
-    -------------------------------- */
+
     window.sendOtp = async function sendOtp(){
       try{
         const r = await postJSON("/api/pin/profile/otp/start/", {}); // Boundary
@@ -178,9 +170,7 @@
       }catch{/* swallow */}
     };
 
-    /* ----------
-    Boundary for Save profile OTP
-    ------------ */
+ 
     (await $id("saveProfile")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const code = (await $id("otpCode")).value.trim();
@@ -202,10 +192,7 @@
       }
     });
 
-    /* --------------------------------------------------------------
-       BOUNDARY FOR OTP SEND FOR PASSWORD CHANGE
-       BCE: postJSON("/api/pin/password/otp/start/", {})
-    -------------------------------------------------------------- */
+ 
     (await $id("sendPwdOtp")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const r = await postJSON("/api/pin/password/otp/start/", {}); // Boundary (adjust if needed)
@@ -219,9 +206,7 @@
       }
     });
 
-    /* 
-        BOUNDARY FOR PASSWORD CHANGE
-        BCE: postJSON("/api/pin/password/change/", { code, new_password }) */
+
     (await $id("changePwd")).addEventListener("click", async (ev) => {
       ev.preventDefault();
       const code = (await $id("pwdOtp")).value.trim();

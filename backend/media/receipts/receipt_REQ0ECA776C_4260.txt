@@ -1,0 +1,3 @@
+Receipt for request REQ0ECA776C
+Amount: $54.52
+Paid via paynow
