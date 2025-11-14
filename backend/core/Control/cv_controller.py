@@ -97,7 +97,7 @@ class CvController:
     def safety_tips(*, user, req_id: str) -> dict:
         cv = CvController._ensure_is_cv(user)
         try:
-            payload = CvEntity.build_safety_prompt_payload(req_id=req_id)
+            payload = CvEntity.promptinfo(req_id=req_id)
         except Request.DoesNotExist:
             raise Http404("Request not found.")
         req = payload["request"]

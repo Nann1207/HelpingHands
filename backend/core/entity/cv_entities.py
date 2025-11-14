@@ -66,7 +66,7 @@ class CvEntity:
         )
 
     @staticmethod
-    def build_safety_prompt_payload(*, req_id: str) -> Dict[str, Any]:
+    def promptinfo(*, req_id: str) -> Dict[str, Any]:
         """
         Fetch the request plus related PIN info and build the prompt payload
         needed for safety tips generation.
