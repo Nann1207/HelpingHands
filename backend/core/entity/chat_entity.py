@@ -2,12 +2,18 @@
 from __future__ import annotations
 from typing import Optional
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from core.models import ChatRoom, Request, RequestStatus
 import django.utils.timezone as timezone
 from datetime import timedelta  
 
 class ChatEntity:
 
+
+    #Fetch a chat room plus its related request
+    @staticmethod
+    def get_chat(chat_id: str) -> ChatRoom:
+        return get_object_or_404(ChatRoom.objects.select_related("request"), pk=chat_id)
 
 
     #Ensures that there is only one chat per request, no duplicates
@@ -44,7 +50,6 @@ class ChatEntity:
             qs = qs.closed()
         return qs.select_related("request").order_by("-opens_at")
     
-
     @staticmethod
     @transaction.atomic
     def complete_request(req: Request) -> Request:
@@ -62,3 +67,9 @@ class ChatEntity:
             chat.expires_at = desired_expiry
             chat.save(update_fields=["expires_at"])
         return req
+
+
+    #Create and store a message in a chat
+    @staticmethod
+    def save_message(chat: ChatRoom, *, sender, body: str):
+        return chat.messages.create(sender=sender, body=body)

@@ -44,24 +44,24 @@ class PinEntity:
         now = timezone.now()
         try:
             return EmailOTP.objects.get(
-                email=email, code=code, purpose=purpose, consumed=False, expires_at__gte=now #Has not been used yet and is not expired
+                email=email, code=code, purpose=purpose, consumed=False, expires_at__gte=now 
             )
         except EmailOTP.DoesNotExist:
             return None
 
 
-    #Marks the OTP as used, so it can’t be reused.
+    #Marks the OTP as used, so it can’t be reused
     @staticmethod
     def consume_email_otp(otp: EmailOTP):
         otp.consumed = True
         otp.save(update_fields=["consumed"]) #Mark the OTP as used
 
 
-    #Updates profile information for a PIN.
+    #Updates profile information for a PIN
     @staticmethod
     @transaction.atomic
     def update_profile_fields(*, pin: PersonInNeed, **fields) -> PersonInNeed:
-        # fields like address, phone etc.
+
         for k, v in fields.items():
             setattr(pin, k, v)
         pin.save(update_fields=list(fields.keys()))
@@ -104,15 +104,12 @@ class PinEntity:
     
     @staticmethod
     def create_flagged_request(*, request, flag_type: str, moderation_reason: str = "", resolved: bool = False):
-        """
-        Create a new FlaggedRequest linked to the given Request.
-        Called when auto moderation detects unsafe content.
-        """
         flag = FlaggedRequest.objects.create(
             request=request,
             flag_type=flag_type or FlagType.AUTO,
-            csr=None,  # auto-flag => no CSR
+            csr=None, 
             reasonbycsr=(f"Auto moderation: {moderation_reason}".strip() if moderation_reason else "Auto moderation"),
             resolved=resolved,
         )
         return flag
+

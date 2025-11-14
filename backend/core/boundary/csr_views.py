@@ -27,7 +27,7 @@ from core.boundary.csr_serializers import (
 )
 
 
-# ---- Permissions -------------------------------------------------------------
+# --- Permissions ---
 
 class IsCSRRep:
     def has_permission(self, request, view):
@@ -38,7 +38,7 @@ def _csr(request) -> CSRRep:
     return request.user.csrrep
 
 
-# ---- Response serializers (UI-shaped) ---------------------------------------
+# --- Response serializers  ---
 
 class ComingSoonResponseSerializer(serializers.Serializer):
     coming_soon = RequestListSerializer(many=True)
@@ -52,7 +52,6 @@ class DashboardResponseSerializer(serializers.Serializer):
 
 
 class _SafeShortlistRow(dict):
-    """Gracefully return None for missing keys when serializing shortlist rows."""
 
     def __missing__(self, key):
         return None
@@ -96,7 +95,7 @@ class CSRFlagSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
-# ---- 1) Dashboard ------------------------------------------------------------
+# --- 1) Dashboard ---
 
 class CSRDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
@@ -107,7 +106,7 @@ class CSRDashboardView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-# ---- 2) Requests Pool --------------------------------------------------------
+# --- 2) Requests Pool ---
 
 
 class CSRRequestPoolView(APIView):
@@ -149,7 +148,7 @@ class CSRShortlistToggleView(APIView):
         ser = ShortlistCreateSerializer(data={"request": request_id}, context={"csr": csr})
         ser.is_valid(raise_exception=True)
         data = CSRRequestController.shortlist_add(csr, request_id)
-        # shape to ShortlistItemSerializer-like row for your HTML table
+        
         row = {
             "shortlist_id": data["id"],
             "request_id": data["request_id"],
@@ -175,7 +174,7 @@ class CSRCommitFromPoolView(APIView):
         return Response(CommitResponseSerializer(data).data, status=status.HTTP_200_OK)
 
 
-# ---- 3) Shortlist Page -------------------------------------------------------
+# --- 3) Shortlist Page ---
 
 class CSRShortlistView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
@@ -186,19 +185,19 @@ class CSRShortlistView(APIView):
         return Response({"items": items}, status=status.HTTP_200_OK)
 
 
-# ---- 4) Commit Page ----------------------------------------------------------
+# --- 4) Commit Page ---
 
 class CSRCommitListView(APIView):
     permission_classes = [IsAuthenticated, IsCSRRep]
 
     def get(self, request):
         data = CSRCommitController.list(_csr(request))
-        # Controller returns {"items": [...]} where each is request-like
+        
         items = RequestListSerializer(data["items"], many=True).data
         return Response({"items": items}, status=status.HTTP_200_OK)
 
 
-# ---- 5) Match Details --------------------------------------------------------
+# --- 5) Match Details ---
 
 
 #THIS IS THE API

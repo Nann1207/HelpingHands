@@ -195,7 +195,7 @@
       renderRequestRows();
     }
 
-    // This resets the claims panel to its initial state
+    
     function resetClaimsPanel(message = "Pick a completed request to see reimbursement claims."){
       qs("[data-selected-label]").textContent = "No request selected.";
       const btn = qs("[data-action='refresh-claims']");
@@ -205,7 +205,7 @@
       qs("[data-claims-container]").innerHTML = `<div class="text-sm text-gray-500">${message}</div>`;
     }
 
-    // This updates the label above the claims panel
+    
     function updateSelectedLabel(requestId){
       const req = state.requests.find(r => r.id === requestId);
       const label = req
@@ -226,12 +226,12 @@
       }
     }
 
-    // Determine if CSR can make a decision on this claim
+    
     function canDecide(status){
       return status !== "reimbursed_by_csr" && status !== "rejected_by_csr";
     }
 
-    // This is the template for a single claim card
+    
     function claimCard(claim){
       const status = claim.status || "submitted";
       const pinVerified = claim.verified_by_pin ?? status === "verified_by_pin";
@@ -246,7 +246,7 @@
       const receiptIsImage = isImageUrl(receiptUrl);
 
 
-      // This section builds the action buttons or status message
+      
       const actions = canDecide(status)
         ? `
             <div class="flex flex-wrap gap-2">

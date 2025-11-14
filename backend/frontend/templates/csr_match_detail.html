@@ -65,7 +65,7 @@
   </main>
 
   <script>
-    // ---------- helpers ----------
+ 
     const qs = (sel, root=document) => root.querySelector(sel);
     const qsa = (sel, root=document) => [...root.querySelectorAll(sel)];
     const getCSRF = () => document.cookie.split("; ").find(c=>c.startsWith("csrftoken="))?.split("=")[1];
@@ -145,7 +145,7 @@
 
     let autoRefreshHandle = null;
 
-    // ---------- page init ----------
+    
     async function initCSRMatchDetail(){
       const reqId = REQUEST_ID?.trim();
       if(!reqId){ location.href = "/csr_match/"; return; }

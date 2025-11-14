@@ -12,8 +12,6 @@ from core.models import (
 )
 
 
-
-
 def _ensure_category(value: str) -> str:
 
     valid = [c[0] for c in ServiceCategory.choices]

@@ -1,4 +1,4 @@
-# core/Boundary/serializers_csr.py
+# core/boundary/serializers_csr.py
 
 
 from rest_framework import serializers

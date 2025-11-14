@@ -169,7 +169,7 @@
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ accepted })
       });
-      await loadData(); // auto-remove if queue advanced/expired
+      await loadData(); // auto remove if queue advanced/expired
     }
 
     async function completeReq(reqId){
@@ -180,7 +180,7 @@
     window.addEventListener("DOMContentLoaded", async ()=>{
       await loadWho();
       await loadData();
-      // optional: auto-refresh pending every 30s so dormant offers disappear
+
       setInterval(()=>loadData().catch(()=>{}), 30000);
     });
   </script>

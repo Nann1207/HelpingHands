@@ -20,7 +20,7 @@ class OtpCodeSerializer(serializers.Serializer):
 
 class ProfileUpdateSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=6)
-    # fields user wants to update
+
     fields = serializers.DictField(child=serializers.CharField(), allow_empty=False)
 
 
@@ -50,9 +50,9 @@ class PinClaimSerializer(serializers.ModelSerializer):
             "id", "request", "request_id", "cv", "cv_id",
             "category", "expense_date", "amount", "payment_method",
             "description", "status",
-            # keep receipt name if you want, optional:
+            # keep receipt name if you want
             "receipt", 
-            # new absolute URL for the UI:
+
             "receipt_url",
             "created_at",
         ]
@@ -61,6 +61,6 @@ class PinClaimSerializer(serializers.ModelSerializer):
         if not obj.receipt:
             return None
         request = self.context.get("request")
-        url = obj.receipt.url  # e.g. /media/receipts/xxx.jpg
+        url = obj.receipt.url  # /media/receipts/filename.jpg
         return request.build_absolute_uri(url) if request else url
 

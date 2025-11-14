@@ -7,14 +7,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* to lock chart panel height */
-    #requestsChartWrap { height: 22rem; } /* ~ h-88 */
+ 
+    #requestsChartWrap { height: 22rem; } 
     #requestsChart { width: 100% !important; height: 100% !important; }
     code.api { font-size: 0.75rem; padding: 0.15rem 0.35rem; background: #f3f4f6; border-radius: 0.25rem; }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
-  <!-- Top Bar -->
+
   <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <a href="/pa_dashboard/" class="flex items-center gap-2">
@@ -118,7 +118,7 @@
       <button id="resetBtn" class="px-3 py-2 rounded-md border hover:bg-gray-100">Reset</button>
     </section>
 
-    <!-- Single, centered chart -->
+
     <section class="grid grid-cols-1">
       <div class="p-4 rounded-xl bg-white shadow-sm max-w-3xl mx-auto w-full">
         <div class="flex items-center justify-between">
@@ -141,7 +141,7 @@
   </main>
 
   <script>
-    // UI
+
     function qs(sel){ return document.querySelector(sel); }
     function buildQuery(params){
       const pairs = Object.entries(params).filter(([_,v]) => v !== undefined && v !== null && v !== "");
@@ -149,7 +149,7 @@
       return "?" + pairs.map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
     }
 
-    // controls
+
     const fromInput = qs("#fromDate");
     const toInput   = qs("#toDate");
     const granSel   = qs("#granularity");
@@ -159,14 +159,13 @@
 
     let requestsChart;
 
-    /*ASYNC BOUNDARY FUNCTION: fetchJSON(url) */
     async function fetchJSON(url){
       const resp = await fetch(url, { credentials: "include" });
       if (!resp.ok) throw new Error("HTTP "+resp.status);
       return resp.json();
     }
 
-    /* ASYNC BOUNDARY FUNCTION: loadWhoAmI()*/
+    /*  loadWhoAmI()*/
     async function loadWhoAmI(){
       try{
         const me = await fetchJSON("/api/auth/me/"); // Boundary call
@@ -176,7 +175,7 @@
       }
     }
 
-    // UI Helpers
+
     function updateApiLabel(fullUrl){
       try{
         const u = new URL(fullUrl, window.location.origin);
@@ -213,7 +212,7 @@
       qs("#reqComplete").textContent = cards["Completed"] ?? "0";
     }
 
-    /* ASYNC BOUNDARY FUNCTION: loadMetrics() */
+    /*  loadMetrics() */
     async function loadMetrics(){
       const params = {
         granularity: granSel.value || "day",
@@ -224,13 +223,12 @@
       const url = `/api/admin/metrics/${query}`;
       updateApiLabel(url);
 
-      // Boundary: fetch metrics
       const data = await fetchJSON(url);
 
-      // Cards
+
       mapCardsToUI(data.cards || {});
 
-      // Chart series + range
+
       const series = (data.charts && data.charts.requests_by_status) ? data.charts.requests_by_status : [];
       const range  = (data.charts && data.charts.range) ? data.charts.range : null;
       qs("#seriesRange").textContent = range ? `${range.from} → ${range.to}` : "";
@@ -275,23 +273,23 @@
       buildExportLink();
     }
 
-    /* Resets UI inputs, then triggers Boundary (loadMetrics)= */
+
     function resetFilters(){
       fromInput.value = "";
       toInput.value   = "";
       granSel.value   = "day";
-      loadMetrics(); // Boundary
+      loadMetrics(); 
     }
 
-    // Wire UI 
-    applyBtn.addEventListener("click", loadMetrics); // Boundary
+
+    applyBtn.addEventListener("click", loadMetrics);
     resetBtn.addEventListener("click", resetFilters);
 
 
     window.addEventListener("DOMContentLoaded", async () => {
-      await loadWhoAmI();  // Boundary
-      buildExportLink();   // UI
-      await loadMetrics(); // Boundary
+      await loadWhoAmI();  
+      buildExportLink();   
+      await loadMetrics(); 
     });
   </script>
 </body>

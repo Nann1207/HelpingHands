@@ -71,7 +71,7 @@
       return r.json();
     }
 
-    const reqId = location.pathname.split("/").filter(Boolean).pop(); // /cv_request/<id>/
+    const reqId = location.pathname.split("/").filter(Boolean).pop(); 
     let chatId = null;
 
     async function loadDetail(){
@@ -90,7 +90,7 @@
         chatLink.href = `/cv_chats/?open=${chatId}`;
         chatLink.classList.remove("hidden");
       }else{
-        // create chat if missing
+
         try{
           const created = await j(`/api/requests/${d.id}/chat/`, { method:"POST" });
           if(created?.id){

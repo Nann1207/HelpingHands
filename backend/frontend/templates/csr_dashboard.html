@@ -224,7 +224,7 @@
         
         if (Notification.permission === "granted") return true;
         if (Notification.permission === "denied") {
-          alert("You previously blocked notifications. Please enable them in browser settings."); // If denied inform the user to change setting
+          alert("You previously blocked notifications. Please enable them in browser settings."); // If denied inform us to change setting
           return false;
         }
 
@@ -263,17 +263,17 @@
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-          // handle both: [ ... ]  OR  { items: [ ... ] }
+          
           const raw = await resp.json();
           const items = Array.isArray(raw) ? raw : (raw.items || []);
           if (!items.length) return;
 
-          // sort by id (oldest → newest)
+          // sort by id (oldest to newest)
           items.sort((a, b) => (a.id || 0) - (b.id || 0));
           const newestId = items[items.length - 1].id || 0;
 
-          // First run after enabling alerts:
-          // just record the latest id so we don't popup ALL old notifications
+          // First run after enabling alerts
+          // just record the latest id so we don't popup alld of old notifications
           if (!Notifs.lastSeenId && newestId) {
             Notifs.lastSeenId = newestId;
             return;

@@ -28,10 +28,9 @@ class CvDashboardView(APIView):
         }
         return Response(payload, status=200)
 
-#  Pending: decision endpoints----------
-
+#  Pending: decision endpoints
 class CvOfferDecisionView(APIView):
-    # POST /api/cv/requests/<req_id>/decision/   { "accepted": true|false }
+    # POST /api/cv/requests/<req_id>/decision/   
     def post(self, request, req_id):
         accepted = bool(request.data.get("accepted"))
         try:
@@ -43,7 +42,6 @@ class CvOfferDecisionView(APIView):
         return Response(result, status=200)
 
 #  Lists 
-
 class CvMyRequestsView(APIView):
     # GET /api/cv/requests/?status=active|complete
     def get(self, request):
@@ -55,7 +53,6 @@ class CvMyRequestsView(APIView):
         return Response(CvRequestListSerializer(qs, many=True).data, status=200)
 
 #  Detail 
-
 class CvRequestDetailView(APIView):
     # GET /api/cv/requests/<req_id>/
     def get(self, request, req_id):
@@ -66,7 +63,6 @@ class CvRequestDetailView(APIView):
         return Response(CvRequestDetailSerializer(req_obj).data, status=200)
 
 #  Safety Tips 
-
 class CvSafetyTipsView(APIView):
     # GET /api/cv/requests/<req_id>/safety_tips/
     def get(self, request, req_id):
@@ -77,7 +73,6 @@ class CvSafetyTipsView(APIView):
         return Response(data, status=200)
 
 #  Complete 
-
 class CvCompleteRequestView(APIView):
     # POST /api/cv/requests/<req_id>/complete/
     def post(self, request, req_id):
@@ -88,7 +83,6 @@ class CvCompleteRequestView(APIView):
         return Response({"request_id": req.id, "status": req.status, "completed_at": req.completed_at}, status=200)
 
 #  Claims 
-
 class CvCreateClaimView(APIView):
     # POST /api/cv/requests/<req_id>/claims/
     def post(self, request, req_id):
@@ -99,6 +93,7 @@ class CvCreateClaimView(APIView):
         except (PermissionDenied, ValidationError) as e:
             return Response({"detail": str(e)}, status=400)
         return Response(ClaimReportSerializer(claim, context={"request": request}).data, status=201)
+
 
 class CvMyClaimsView(APIView):
     # GET /api/cv/claims/

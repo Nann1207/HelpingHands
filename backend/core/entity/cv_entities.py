@@ -12,19 +12,13 @@ from core.models import (
 )
 
 class CvEntity:
-    """
-    DB-only for CV use-cases.
-    """
 
-    # ---------- DASHBOARD LISTS ----------
+
+    
 
     @staticmethod
     def list_pending_offers(*, cv_id: str):
-        """
-        Offers that are currently ACTIVE for this CV from the match queue.
-        Auto-removal happens naturally when MatchQueue advances/expires;
-        this list only shows offers where this CV is the current slot.
-        """
+
         now = timezone.now()
         return (
             Request.objects
@@ -41,9 +35,7 @@ class CvEntity:
 
     @staticmethod
     def list_active_sorted(*, cv_id: str):
-        """
-        Accepted requests (ACTIVE), sorted by upcoming appointment first.
-        """
+
         return (
             Request.objects.filter(cv_id=cv_id, status=RequestStatus.ACTIVE)
             .select_related("pin", "cv")
@@ -67,10 +59,7 @@ class CvEntity:
 
     @staticmethod
     def promptinfo(*, req_id: str) -> Dict[str, Any]:
-        """
-        Fetch the request plus related PIN info and build the prompt payload
-        needed for safety tips generation.
-        """
+
         req = (
             Request.objects
             .select_related("pin", "match_queue")
@@ -107,7 +96,7 @@ class CvEntity:
             "prompt": prompt,
         }
 
-    # ---------- CLAIMS ----------
+    # --- CLAIMS ---
 
     @staticmethod
     @transaction.atomic

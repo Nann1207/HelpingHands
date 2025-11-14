@@ -20,17 +20,9 @@ from core.Control.chat_controller import ChatController
 from core.Control.csr_controller import CSRMatchController  
 
 class CvController:
-    """
-    - Dashboard sections (Pending offers / Active / Completed)
-    - Accept / Decline offer
-    - List Active/Completed requests
-    - Request details (click-through)
-    - Complete a request (delegates to ChatController)
-    - Safety tips (Sea Lion Llama API with  fallback)
-    - Submit & list claims
-    """
 
-    # ---------- guards ----------
+
+    # ---guards ---
     @staticmethod
     def _ensure_is_cv(user) -> CV:
         if not hasattr(user, "cv"):
@@ -48,7 +40,7 @@ class CvController:
             or (mq.current_index == 3 and mq.cv3queue_id == cv_id)
         )
 
-    # ---------- dashboard ----------
+    # ---- dashboard ---
 
     @staticmethod
     def dashboard(*, user) -> Dict[str, Any]:
@@ -58,7 +50,7 @@ class CvController:
         completed = CvEntity.list_completed(cv_id=cv.id)
         return {"pending": pending, "active": active, "completed": completed}
 
-    # ---------- lists & detail ----------
+    # --- lists & detail ---
     @staticmethod
     def list_requests(*, user, status: str):
         cv = CvController._ensure_is_cv(user)
@@ -76,7 +68,7 @@ class CvController:
             raise PermissionDenied("Not your request.")
         return req
 
-    # ---------- offer decisions ----------
+    # --- offer decisions ---
     
     @staticmethod
     def decide_offer(*, user, req_id: str, accepted: bool):
@@ -85,14 +77,13 @@ class CvController:
         data = CSRMatchController.cv_decision(request_id=req_id, cv_id=cv.id, accepted=accepted)
         return data
 
-    # ---------- completion ----------
+    # --- completion ---
 
     @staticmethod
     def complete_request(*, user, req_id: str):
         return ChatController.complete_request(user=user, req_id=req_id)
 
-    # ---------- safety tips ----------
-
+    # --- safety tips ---
     @staticmethod
     def safety_tips(*, user, req_id: str) -> dict:
         cv = CvController._ensure_is_cv(user)
@@ -163,8 +154,7 @@ class CvController:
         tips = CvController._fallback_tips(req=req, age=age, pin=pin)
         return {"request_id": req.id, "tips": tips}
 
-    # ---------- claims ----------
-
+    # --- claims ---
     @staticmethod
     def report_claim(*, user, req_id: str, **payload):
         cv = CvController._ensure_is_cv(user)
@@ -179,7 +169,7 @@ class CvController:
         cv = CvController._ensure_is_cv(user)
         return CvEntity.list_my_claims(cv_id=cv.id)
 
-    # helper
+    
     @staticmethod
     def _parse_llm_tips(payload):
         if not isinstance(payload, dict):
@@ -231,6 +221,7 @@ class CvController:
         if pin and getattr(pin, "preferred_cv_gender", "") == "female":
             tips.append("Prioritize well-lit, public meeting points for the person-in-need when possible.")
         return tips
+
 
 
 class CvClaimController:

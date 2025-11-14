@@ -35,7 +35,7 @@ def create_pin(*, user: AbstractUser, name: str, dob, phone: str, address: str,
 def create_cv(*, user: AbstractUser, company: Company, name: str, dob, phone: str, address: str,
               gender: str, main_language: str, second_language: str = "",
               service_category_preference: str = "Healthcare") -> CV:
-    # (Optional) validate category; exceptions bubble to Boundary for a 400 response
+    
     valid = [c[0] for c in ServiceCategory.choices]
     if service_category_preference not in valid:
         raise ValueError(f"Invalid service_category_preference; choose from: {valid}")

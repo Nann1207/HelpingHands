@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from core.models import Request, ClaimReport, ChatRoom
 
-#  tiny chat helper 
 
 class _ChatMixin(serializers.Serializer):
     chat_id = serializers.SerializerMethodField()
@@ -16,7 +15,6 @@ class _ChatMixin(serializers.Serializer):
         return bool(chat and chat.is_open)
 
 #  dashboard / lists 
-
 class CvPendingItemSerializer(_ChatMixin, serializers.ModelSerializer):
     offered_rank = serializers.SerializerMethodField()
     offer_deadline = serializers.DateTimeField(source="match_queue.deadline", read_only=True)
@@ -61,7 +59,6 @@ class CvRequestDetailSerializer(_ChatMixin, serializers.ModelSerializer):
         ]
 
 #  claims 
-
 class ClaimCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClaimReport

@@ -91,12 +91,18 @@ class RequestEntity:
         if not req:
             return
 
+        update_fields = ["status"]
+
         if action == "reject":
             req.status = RequestStatus.REJECTED #If the action is "reject", it sets the request's status to REJECTED
         elif action == "accept":
             req.status = RequestStatus.PENDING #If the action is "resolve", it sets the request's status to PENDING
+            # Pending requests must not keep any commit metadata to satisfy DB constraint
+            req.committed_by_csr = None
+            req.committed_at = None
+            update_fields.extend(["committed_by_csr", "committed_at"])
 
-        req.save(update_fields=["status"]) #Saves the updated status back to the database
+        req.save(update_fields=update_fields) #Saves the updated status back to the database
     
 
     #Export the requests to CSV
@@ -274,7 +280,5 @@ class FlagEntity:
             "open":     FlaggedRequest.objects.filter(resolved=False).count(),
             "resolved": FlaggedRequest.objects.filter(resolved=True).count(),
         }
-
-
 
 

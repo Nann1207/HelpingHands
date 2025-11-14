@@ -103,14 +103,14 @@
 
     (async () => {
   
-      const rows       = await $id("rows");        // <tbody id="rows">
-      const statusLine = await $id("statusLine");  // <p id="statusLine">
-      // Tab buttons
+      const rows       = await $id("rows");        
+      const statusLine = await $id("statusLine");  
+     
       const tabs = document.querySelectorAll(".tab");
 
      
 
-      let current = "pending"; // default tab
+      let current = "pending"; 
 
 
       async function fetchJSON(url) {
@@ -134,9 +134,9 @@
 
 
       function rowHtml(r) {
-        const created  = (r.created_at || "").slice(0, 10);       // "YYYY-MM-DD"
-        const apptDate = (r.appointment_date || "");              // as-is
-        const apptTime = (r.appointment_time || "").slice(0, 5);  // "HH:MM"
+        const created  = (r.created_at || "").slice(0, 10);       
+        const apptDate = (r.appointment_date || "");              
+        const apptTime = (r.appointment_time || "").slice(0, 5);  
         return `
           <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${r.id}">
             <td class="px-3 py-2 font-medium">${r.id}</td>
@@ -151,32 +151,28 @@
           </tr>`;
       }
 
-      /**
-       * ===========
-       * BOUNDARY 
-       * -----------
-       */
+
       async function load(status) {
-        setActiveTab(status); // Presentation
+        setActiveTab(status); 
 
 
-        // Simple loading row
+   
         rows.innerHTML =
           `<tr><td class="px-3 py-4 text-gray-500" colspan="9">Loading…</td></tr>`;
 
 
-        // Boundary: fetch request list for the given status
+        
         const data = await fetchJSON(`/api/pin/my/requests/?status=${encodeURIComponent(status)}`);
 
 
 
-        // render rows if empty
+       
         rows.innerHTML =
           (data || []).map(rowHtml).join("") ||
           `<tr><td class="px-3 py-4 text-gray-500" colspan="9">No requests.</td></tr>`;
 
 
-        // Presentation: status line
+        
         statusLine.textContent = `Loaded ${data?.length || 0} ${status} requests`;
 
         
