@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.shortcuts import get_object_or_404 #If object not found, return 404 error
 from django.core.exceptions import PermissionDenied, ValidationError
-from core.models import Request, RequestStatus, ChatRoom
+from core.models import Request, ChatRoom
 from core.entity.chat_entity import ChatEntity
 
 class ChatController:
@@ -71,33 +71,7 @@ class ChatController:
     #Close out a request and set chat expiry
     @staticmethod
     def complete_request(*, user, req_id: str):
-
-
-        #Get the request object
         req = get_object_or_404(Request, pk=req_id)
-
-       #Ensure CV or PIN is allowed to access this request
         ChatController._ensure_cv_or_pin(user, req)
+        return ChatEntity.complete_request(req)
 
-        #If the request is already complete, ensure the completed_at time exists.
-        if req.status == RequestStatus.COMPLETE:
-
-            completed_at = req.completed_at or timezone.now()
-            req.completed_at = completed_at
-            req.save(update_fields=["completed_at"]) 
-
-        else:
-            req.status = RequestStatus.COMPLETE
-            if not req.completed_at:
-                req.completed_at = timezone.now()
-            req.save(update_fields=["status", "completed_at"])
-
-        # Ensure chat exists 
-        chat = ChatEntity.get_or_create_for_request(req)
-        #Calculates the expiry time = completed_at + 24 hours.
-        desired_expiry = req.completed_at + timedelta(hours=24)
-        if chat.expires_at != desired_expiry:
-            chat.expires_at = desired_expiry
-            chat.save(update_fields=["expires_at"]) #Returns the updated request objec
-
-        return req

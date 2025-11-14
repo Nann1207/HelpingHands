@@ -1,5 +1,6 @@
 # core/entity/admin_entities.py
 
+
 #THIS IS THE ADMIN ENTITY LAYER
 
 from __future__ import annotations

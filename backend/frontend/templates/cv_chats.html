@@ -40,12 +40,12 @@
     function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
     async function j(u,o){const r=await fetch(u,{credentials:"include",...o}); if(!r.ok) throw new Error(await r.text()); return r.json();}
 
-    const chatList = qs("#chatList");
-    const messages = qs("#messages");
-    const sendForm = qs("#sendForm");
-    const msgInput = qs("#msg");
-    const chatHeader = qs("#chatHeader");
-    let activeChatId = null;
+    const chatList = qs("#chatList"); // left column, list of chats
+    const messages = qs("#messages"); // right side, the messages area
+    const sendForm = qs("#sendForm"); // basically the form at the bottom (input + send button)
+    const msgInput = qs("#msg"); //the text box where the CV types
+    const chatHeader = qs("#chatHeader"); // the header above messages showing chat ID
+    let activeChatId = null; // currently open chat ID
 
     function li(c){
       const open = c.is_open ? `<span class="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">Open</span>`
@@ -58,9 +58,9 @@
 
     // Load chats and populate list
     async function loadChats(){
-      // same endpoints as PIN, filtered by current CV
-      const open = await j("/api/me/chats/?status=open");
-      const closed = await j("/api/me/chats/?status=closed");
+
+      const open = await j("/api/me/chats/?status=open"); //List of open chats
+      const closed = await j("/api/me/chats/?status=closed"); //List of closed chats
       chatList.innerHTML = `
         <div class="px-3 py-1 text-xs uppercase text-gray-500">Open</div>
         ${(open||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No open chats</div>'}
@@ -68,7 +68,7 @@
         ${(closed||[]).map(li).join("") || '<div class="px-3 py-2 text-sm text-gray-500">No past chats</div>'}
       `;
       chatList.querySelectorAll("button[data-id]").forEach(b=>{
-        b.addEventListener("click", ()=> openChat(b.getAttribute("data-id")));
+        b.addEventListener("click", ()=> openChat(b.getAttribute("data-id"))); // click handler to open chat
       });
 
       // autoselect if ?open=<id>

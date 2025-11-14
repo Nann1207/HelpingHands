@@ -18,6 +18,8 @@
     .kv .k { color:#6b7280 }  
   </style>
 </head>
+
+
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <!-- Top Bar -->
   <header class="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
@@ -38,12 +40,12 @@
   <main class="max-w-3xl mx-auto px-4 py-8 space-y-6">
     <h1 class="text-2xl font-bold">Request Details</h1>
 
-    <!-- Boundary-UI: Request summary card (pure presentation) -->
+    <!-- Request summary card -->
     <div id="card" class="rounded-xl border bg-white p-4 space-y-2">
       <div class="text-sm text-gray-500">Loading…</div>
     </div>
 
-    <!-- Boundary-UI: Claims (PIN verification/dispute) -->
+    <!-- Claims  -->
     <section id="claimBox" class="hidden rounded-xl border bg-white p-4 space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold">Verify Claim</h2>
@@ -155,7 +157,7 @@
 
     function looksLikeImage(url){ return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url||""); }
 
-    /* ========== THEEE BOUNDARY =========== */
+   
 
     async function renderRequest(r){
  

@@ -1,8 +1,6 @@
 # core/entity/csr_entity.py
 """
-ENTITY layer (aka repositories/services) for CSR features.
-Only ORM/database logic lives here (no HTTP, no DRF objects).
-Safe to unit test directly.
+ENTITY LAYER
 """
 
 from __future__ import annotations

@@ -1,4 +1,7 @@
 from __future__ import annotations
+from datetime import date
+from typing import Dict, Any
+
 from django.db import transaction
 from django.db.models import Q, F
 from django.utils import timezone
@@ -61,6 +64,48 @@ class CvEntity:
             Request.objects.filter(cv_id=cv_id, status=status)
             .order_by("-created_at")
         )
+
+    @staticmethod
+    def build_safety_prompt_payload(*, req_id: str) -> Dict[str, Any]:
+        """
+        Fetch the request plus related PIN info and build the prompt payload
+        needed for safety tips generation.
+        """
+        req = (
+            Request.objects
+            .select_related("pin", "match_queue")
+            .get(pk=req_id)
+        )
+        pin = req.pin
+        age = None
+        if pin and pin.dob:
+            today = date.today()
+            age = today.year - pin.dob.year - (
+                (today.month, today.day) < (pin.dob.month, pin.dob.day)
+            )
+        prompt = {
+            "task": "risk_safety_guidance",
+            "inputs": {
+                "age": age,
+                "gender": getattr(pin, "preferred_cv_gender", None),
+                "category": req.service_type,
+                "description": req.description,
+                "locations": {
+                    "pickup": req.pickup_location,
+                    "service": req.service_location,
+                },
+            },
+            "constraints": {
+                "tone": "calm, practical, concise",
+                "max_items": 6,
+            },
+        }
+        return {
+            "request": req,
+            "pin": pin,
+            "age": age,
+            "prompt": prompt,
+        }
 
     # ---------- CLAIMS ----------
 

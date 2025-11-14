@@ -2,7 +2,9 @@
 from __future__ import annotations
 from typing import Optional
 from django.db import transaction
-from core.models import ChatRoom, Request
+from core.models import ChatRoom, Request, RequestStatus
+import django.utils.timezone as timezone
+from datetime import timedelta  
 
 class ChatEntity:
 
@@ -41,3 +43,22 @@ class ChatEntity:
         elif status == "closed":
             qs = qs.closed()
         return qs.select_related("request").order_by("-opens_at")
+    
+
+    @staticmethod
+    @transaction.atomic
+    def complete_request(req: Request) -> Request:
+        if req.status != RequestStatus.COMPLETE:
+            req.status = RequestStatus.COMPLETE
+            if not req.completed_at:
+                req.completed_at = timezone.now()
+        else:
+            req.completed_at = req.completed_at or timezone.now()
+        req.save(update_fields=["status", "completed_at"])
+
+        chat, _ = ChatRoom.objects.get_or_create(request=req)
+        desired_expiry = req.completed_at + timedelta(hours=24)
+        if chat.expires_at != desired_expiry:
+            chat.expires_at = desired_expiry
+            chat.save(update_fields=["expires_at"])
+        return req

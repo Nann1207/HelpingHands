@@ -166,8 +166,9 @@
       modalReqId.textContent  = flag.request_id ?? "-";
       modalNotes.value = "";
       modalError.classList.add("hidden");
+
       // default decision = accept
-      document.querySelectorAll('input.decision[value="accept"]')[0].checked = true;
+      document.querySelectorAll('input.decision[value="accept"]')[0].checked = true; 
       modal.classList.remove("hidden");
     }
     function closeModal(){
@@ -176,7 +177,7 @@
     }
 
     /* ==================================
-       ASYNC BOUNDARY FUNCTION: load()
+       BOUNDARY FUNCTION: load()
     ====================================== */
     async function load(){
       const params = new URLSearchParams();
@@ -272,7 +273,8 @@
         modalError.classList.remove("hidden");
       }
     }
-    // ---------- Event wiring ----------
+    
+
     function bindFilters(){
       [resolvedSel, ftypeSel].forEach(el => el.addEventListener("change", load));
       [fromInput, toInput].forEach(el => el.addEventListener("change", () => {
@@ -296,7 +298,7 @@
         if (e.target === modal) hide();
       });
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && !modal.classList.contains("hidden")){
+        if (e.key === "Escape" && !modal.classList.contains("hidden")){ 
           hide();
         }
       });

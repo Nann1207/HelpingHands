@@ -1,11 +1,10 @@
 from __future__ import annotations
 import json
-import logging
-from datetime import date
 from typing import Dict, Any
 
 
 from django.conf import settings
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied, ValidationError
 
@@ -14,8 +13,6 @@ try:
 except ImportError: 
     requests = None
 
-
-logger = logging.getLogger(__name__)
 
 from core.models import Request, RequestStatus, CV, MatchQueueStatus
 from core.entity.cv_entities import CvEntity
@@ -99,34 +96,16 @@ class CvController:
     @staticmethod
     def safety_tips(*, user, req_id: str) -> dict:
         cv = CvController._ensure_is_cv(user)
-        req = get_object_or_404(Request.objects.select_related("pin", "match_queue"), pk=req_id)
+        try:
+            payload = CvEntity.build_safety_prompt_payload(req_id=req_id)
+        except Request.DoesNotExist:
+            raise Http404("Request not found.")
+        req = payload["request"]
+        pin = payload["pin"]
+        age = payload["age"]
+        prompt = payload["prompt"]
         if req.cv_id != cv.id and not CvController._has_pending_offer(req, cv.id):
             raise PermissionDenied("Not your request.")
-
-        # Prepare input
-        pin = req.pin
-        age = None
-        if pin.dob:
-            today = date.today()
-            age = today.year - pin.dob.year - ((today.month, today.day) < (pin.dob.month, pin.dob.day))
-
-        prompt = {
-            "task": "risk_safety_guidance",
-            "inputs": {
-                "age": age,
-                "gender": pin.preferred_cv_gender,
-                "category": req.service_type,
-                "description": req.description,
-                "locations": {
-                    "pickup": req.pickup_location,
-                    "service": req.service_location
-                }
-            },
-            "constraints": {
-                "tone": "calm, practical, concise",
-                "max_items": 6
-            }
-        }
 
         api_key = getattr(settings, "SEA_LION_LLAMA_API_KEY", None)
         endpoint = getattr(settings, "SEA_LION_LLAMA_ENDPOINT", "https://api.sea-lion.ai/v1/chat/completions")
@@ -177,17 +156,11 @@ class CvController:
                 resp.raise_for_status()
                 parsed = CvController._parse_llm_tips(resp.json())
                 if parsed:
-                    logger.info("Sea Lion safety tips generated for request %s via %s", req.id, endpoint)
                     return {"request_id": req.id, "tips": parsed}
-            except (requests.RequestException, ValueError, KeyError) as exc:
-                logger.warning("Sea Lion safety tips fetch failed for request %s: %s", req.id, exc)
-        elif api_key and not requests:
-            logger.warning("Sea Lion API key configured but 'requests' not installed; using fallback tips.")
-        else:
-            logger.info("Sea Lion API not configured; using fallback tips.")
+            except (requests.RequestException, ValueError, KeyError):
+                pass
 
         tips = CvController._fallback_tips(req=req, age=age, pin=pin)
-        logger.info("Fallback safety tips returned for request %s", req.id)
         return {"request_id": req.id, "tips": tips}
 
     # ---------- claims ----------

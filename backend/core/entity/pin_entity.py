@@ -27,7 +27,7 @@ class PinEntity:
         if status:
             qs = qs.filter(status=status)
 
-        qs = qs.annotate(shortlist_count=Count("shortlisted_by", distinct=True))    
+        qs = qs.annotate(shortlist_count=Count("shortlisted_by", distinct=True))   
         return qs.order_by("-created_at")
 
 

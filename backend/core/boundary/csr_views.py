@@ -104,7 +104,7 @@ class CSRDashboardView(APIView):
 
     def get(self, request):
         data = CSRDashboardController.get_dashboard(_csr(request))
-        return Response(DashboardResponseSerializer(data).data, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 # ---- 2) Requests Pool --------------------------------------------------------
@@ -271,7 +271,7 @@ class CSRNotificationsView(APIView):
 
     def get(self, request):
         data = CSRNotificationController.list(request.user)  # {"items":[...]}
-        return Response(NotificationSerializer(data["items"], many=True).data, status=status.HTTP_200_OK)
+        return Response(data["items"], status=status.HTTP_200_OK)
 
 
 # ---- 7) Completed Requests & Claims -----------------------------------------
